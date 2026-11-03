@@ -1,1 +1,1 @@
-{"root":["./vite.config.ts","./vitest.config.ts","./tests/crypto.test.ts","./tests/engine.test.ts","./tests/igclient.test.ts","./tests/ingest.test.ts","./tests/parse.test.ts","./tests/router.test.ts","./tests/signature.test.ts","./tests/tenancy.test.ts"],"version":"6.0.3"}
+{"root":["./vite.config.ts","./vitest.config.ts","./tests/automations.test.ts","./tests/crypto.test.ts","./tests/engine.test.ts","./tests/igclient.test.ts","./tests/ingest.test.ts","./tests/parse.test.ts","./tests/router.test.ts","./tests/signature.test.ts","./tests/tenancy.test.ts"],"version":"6.0.3"}

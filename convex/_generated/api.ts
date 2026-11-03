@@ -5,6 +5,7 @@
  */
 
 import type * as auth from "../auth.js";
+import type * as automations from "../automations.js";
 import type * as engine_graph from "../engine/graph.js";
 import type * as engine_ingest from "../engine/ingest.js";
 import type * as engine_interpreter from "../engine/interpreter.js";
@@ -29,6 +30,7 @@ import type { ComponentApi as rateLimiter_api } from "@convex-dev/rate-limiter/_
 
 declare const fullApi: ApiFromModules<{
   "auth": typeof auth;
+  "automations": typeof automations;
   "engine/graph": typeof engine_graph;
   "engine/ingest": typeof engine_ingest;
   "engine/interpreter": typeof engine_interpreter;

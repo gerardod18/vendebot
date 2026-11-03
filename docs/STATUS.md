@@ -5,7 +5,7 @@
 
 ## Current state (2026-11-03)
 - Phase 0 done: Vite/React/Tailwind skeleton (sign in/up), Convex config with all components, full schema, Better Auth wiring. `tsc -b` and `vite build` pass.
-- Pure, tested core logic: `instagram/signature.ts`, `instagram/parse.ts`, `lib/crypto.ts`, `engine/router.ts` + `lib/tenancy.ts`/`orgs.ts` + `engine/ingest.ts` + `meta.ts` webhook routes `instagram/client.ts` `engine/graph.ts` + `engine/interpreter.ts` + `engine/templates.ts` (59 vitest tests passing, incl. cross-tenant denial and webhook idempotency).
+- Pure, tested core logic: `instagram/signature.ts`, `instagram/parse.ts`, `lib/crypto.ts`, `engine/router.ts` + `lib/tenancy.ts`/`orgs.ts` + `engine/ingest.ts` + `meta.ts` webhook routes `instagram/client.ts` `engine/graph.ts` + `engine/interpreter.ts` + `engine/templates.ts` `automations.ts` (63 vitest tests passing, incl. cross-tenant denial and webhook idempotency).
 - **Not yet run against a real Convex deployment** (the agent sandbox can't reach one). Codegen is stubbed offline, see Known issues.
 - Handoff docs written: `CLAUDE.md`, `docs/PLAN.md`, `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`, `docs/META_SETUP.md`, `docs/RESEARCH.md`.
 
@@ -22,9 +22,11 @@ vite 8, typescript 6, tailwindcss 4, vitest 5, convex-test 0.0.67.
 
 ## Next steps (in order)
 1. Owner: run `npx convex dev` once to create or link the Convex deployment (writes `.env.local`).
-2. Phase 1 remainder: frontend workspace picker (create/switch workspace) and invites (`invites` table exists, no functions yet). Then, in this order: (a) `automations.ts` CRUD (TemplateConfig → flow + flowVersion + trigger, validated by `buildGraph`), (b) `engine/runner.ts` Workflow wrapper executing interpreter effects + the event processor wired from `meta.ts` (route → run), (c) outbound send helper with Rate Limiter + token decryption, (d) inbox queries/human send/takeover, (e) AI node via Convex Agent (Phase 5), (f) frontend pages.
+2. Phase 1 remainder: frontend workspace picker (create/switch workspace) and invites (`invites` table exists, no functions yet). Then, in this order: (a) ~~`automations.ts` CRUD~~ (done), (b) `engine/runner.ts` Workflow wrapper executing interpreter effects + the event processor wired from `meta.ts` (route → run), (c) outbound send helper with Rate Limiter + token decryption, (d) inbox queries/human send/takeover, (e) AI node via Convex Agent (Phase 5), (f) frontend pages.
 3. Owner (in parallel): create the Meta app following `docs/META_SETUP.md` and add their Instagram account as a tester.
 4. Phase 2 → 3 → 4 → 5 as in `PLAN.md`.
+
+> **Why the runner/AI/frontend aren't done:** they need a live Convex deployment to develop against (Workflow/Agent components, generated types, realtime UI). The agent sandbox couldn't reach Convex, so everything built so far is the part verifiable offline (pure logic + convex-test). Pick up (b)–(f) in a session where `npx convex dev` works.
 
 ## Owner actions pending
 - [x] Claude GitHub App access on `gerardod18/vendebot` (pushes work).
@@ -42,5 +44,6 @@ vite 8, typescript 6, tailwindcss 4, vitest 5, convex-test 0.0.67.
 - The cloud agent sessions that created this repo couldn't reach developers.facebook.com, tanstack.com or docs.convex.dev (network policy). Meta details in the docs come from secondary sources; verify them when you have access.
 
 ## Log
+- 2026-11-03: Added Graph client, flow graph/interpreter/templates, automations CRUD. 63 tests. Pushed after each milestone (conventional commits).
 - 2026-11-03: Phase 0 scaffold + pure core (signature, parser, crypto, router) with tests. Decision D9 (own org tables).
 - 2026-11-03: Research + planning session. Chose stack and decisions D1–D8. Created repo docs and installed deps.

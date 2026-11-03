@@ -64,3 +64,36 @@ export function buildGraph(cfg: TemplateConfig): Graph {
   if (!v.ok) throw new Error(`template produced an invalid graph: ${v.errors.join("; ")}`);
   return v.graph;
 }
+
+import { z } from "zod";
+
+const qr = z.object({ title: z.string().min(1).max(20), payload: z.string().min(1).max(200) });
+
+export const templateConfigSchema = z.discriminatedUnion("key", [
+  z.object({
+    key: z.enum(["keywordReply", "welcome", "storyMention", "commentToDm"]),
+    text: z.string().min(1).max(1000),
+    quickReplies: z.array(qr).max(13).optional(),
+    handoffAfter: z.boolean().optional(),
+  }),
+  z.object({
+    key: z.literal("defaultReply"),
+    fallbackText: z.string().min(1).max(1000),
+    ai: z
+      .object({
+        instructions: z.string().min(1).max(4000),
+        exitWhen: z.string().max(500).optional(),
+        timeoutMinutes: z.number().int().min(1).max(10080).optional(),
+      })
+      .optional(),
+  }),
+]);
+
+/** Which trigger type each template installs. */
+export const TEMPLATE_TRIGGER: Record<TemplateKey, "keyword" | "welcome" | "default" | "comment" | "storyMention"> = {
+  keywordReply: "keyword",
+  welcome: "welcome",
+  defaultReply: "default",
+  commentToDm: "comment",
+  storyMention: "storyMention",
+};
