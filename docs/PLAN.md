@@ -39,7 +39,8 @@ Work top to bottom inside a phase. Each item should be roughly one PR or commit.
 - [x] **Pure interpreter** `engine/interpreter.ts` (`step()` state machine returning effects) + tests. Node types done: message, quickReplies, filter, action, wait, waitForReply, aiAgent, handoff. (`card`/carousel not implemented.)
 - [ ] **`engine/runner.ts`: Convex Workflow wrapper** that calls `step()`, executes the effects durably (send via IG client, tag/field/note mutations, http, scheduleTimeout → resume input), persists `flowRuns`, and is started from the webhook processor (routeEvent → flow). Not started.
 - [x] Template builders `engine/templates.ts` (keywordReply, welcome, defaultReply w/ optional AI + business-hours filter, commentToDm, storyMention).
-- [ ] Templates + forms UI + CRUD mutations (`automations.ts`: create flow+version+trigger from a TemplateConfig):
+- [x] CRUD `automations.ts` (create flow+version+trigger from a TemplateConfig, list, setEnabled, remove) + tests.
+- [ ] Templates forms UI (React):
   - [ ] Default reply (with business-hours filter → AI or "we'll reply soon")
   - [ ] Keyword reply
   - [ ] Welcome message
