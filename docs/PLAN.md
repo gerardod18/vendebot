@@ -26,9 +26,9 @@ Work top to bottom inside a phase. Each item should be roughly one PR or commit.
 - [ ] Cron: refresh tokens expiring within 10 days; mark `expired` on failure
 
 ## Phase 3: Webhook pipeline + inbox
-- [ ] `GET /meta/webhook` verification (`hub.mode`, `hub.verify_token`, `hub.challenge`)
-- [ ] `POST /meta/webhook`: ~~signature check + tests~~ (done), ~~parse + fixture tests~~ (done), **ingest mutation with dedupe + HTTP route still to do**
-- [ ] Contacts + conversations + messages upsert; contact profile fetch (name, username)
+- [x] `GET /meta/webhook` verification (`convex/meta.ts`, route in `http.ts`)
+- [x] `POST /meta/webhook`: signature check, parse, `engine/ingest.ts` ingest mutation with dedupe (HTTP route in `meta.ts`). **Still TODO: enqueue processing on the `eventPool` Workpool** (see TODO in `meta.ts`).
+- [x] Contacts + conversations + messages upsert (in `ingest.ts`). **TODO: contact profile fetch (name, username) via Graph API.**
 - [ ] Inbox UI: conversation list (live), thread view, send a human reply (uses `HUMAN_AGENT` tag when outside 24h), take over / give back to bot
 - [ ] Rate-limited outbound send helper (per igAccount)
 
