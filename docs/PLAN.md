@@ -6,10 +6,10 @@ Work top to bottom inside a phase. Each item should be roughly one PR or commit.
 ## Phase 0: Foundations (repo + tooling)
 - [x] Repo created (`gerardod18/vendebot`), dependencies installed (see `package.json`)
 - [x] Handoff docs: `CLAUDE.md`, `docs/*`
-- [ ] Vite + React + Tailwind v4 skeleton (`index.html`, `src/main.tsx`, `vite.config.ts`, `tsconfig*.json`)
-- [ ] `convex/convex.config.ts` registering components: agent, workflow, workpool, rateLimiter, betterAuth
+- [x] Vite + React + Tailwind v4 skeleton (`index.html`, `src/main.tsx`, `vite.config.ts`, `tsconfig*.json`)
+- [x] `convex/convex.config.ts` registering components: agent, workflow, workpool (`eventPool`), rateLimiter, betterAuth
 - [ ] `npx convex dev` linked to a deployment (owner runs this locally; needs a Convex login)
-- [ ] vitest + convex-test configured (`vitest.config.ts`, edge-runtime environment for `convex/`)
+- [x] vitest + convex-test configured (`vitest.config.ts`, edge-runtime)
 - [ ] CI (GitHub Actions): `npm ci`, typecheck, test
 
 ## Phase 1: Auth + tenancy
