@@ -5,8 +5,11 @@
  */
 
 import type * as auth from "../auth.js";
+import type * as engine_graph from "../engine/graph.js";
 import type * as engine_ingest from "../engine/ingest.js";
+import type * as engine_interpreter from "../engine/interpreter.js";
 import type * as engine_router from "../engine/router.js";
+import type * as engine_templates from "../engine/templates.js";
 import type * as http from "../http.js";
 import type * as instagram_client from "../instagram/client.js";
 import type * as instagram_parse from "../instagram/parse.js";
@@ -26,8 +29,11 @@ import type { ComponentApi as rateLimiter_api } from "@convex-dev/rate-limiter/_
 
 declare const fullApi: ApiFromModules<{
   "auth": typeof auth;
+  "engine/graph": typeof engine_graph;
   "engine/ingest": typeof engine_ingest;
+  "engine/interpreter": typeof engine_interpreter;
   "engine/router": typeof engine_router;
+  "engine/templates": typeof engine_templates;
   "http": typeof http;
   "instagram/client": typeof instagram_client;
   "instagram/parse": typeof instagram_parse;
