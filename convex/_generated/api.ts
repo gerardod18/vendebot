@@ -10,6 +10,8 @@ import type * as http from "../http.js";
 import type * as instagram_parse from "../instagram/parse.js";
 import type * as instagram_signature from "../instagram/signature.js";
 import type * as lib_crypto from "../lib/crypto.js";
+import type * as lib_tenancy from "../lib/tenancy.js";
+import type * as orgs from "../orgs.js";
 
 import type { ApiFromModules, FilterApi, FunctionReference } from "convex/server";
 import { anyApi, componentsGeneric } from "convex/server";
@@ -26,6 +28,8 @@ declare const fullApi: ApiFromModules<{
   "instagram/parse": typeof instagram_parse;
   "instagram/signature": typeof instagram_signature;
   "lib/crypto": typeof lib_crypto;
+  "lib/tenancy": typeof lib_tenancy;
+  "orgs": typeof orgs;
 }>;
 
 export const api: FilterApi<typeof fullApi, FunctionReference<any, "public">> = anyApi as any;

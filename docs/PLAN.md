@@ -13,10 +13,10 @@ Work top to bottom inside a phase. Each item should be roughly one PR or commit.
 - [ ] CI (GitHub Actions): `npm ci`, typecheck, test
 
 ## Phase 1: Auth + tenancy
-- [ ] Better Auth via `@convex-dev/better-auth` (email + password; Google later) with the **organization plugin**
-- [ ] `convex/lib/tenancy.ts`: `orgQuery` / `orgMutation` wrappers (resolve session → active org → member role). Tests prove cross-org access is denied.
+- [x] Better Auth via `@convex-dev/better-auth` (email + password) wired in `convex/auth.ts` + `http.ts`. Org plugin NOT used (see D9). Google sign-in later.
+- [x] `convex/lib/tenancy.ts`: `orgQuery` / `orgMutation` / `orgAdminMutation` wrappers (identity → member → role). Tests prove cross-org access is denied (`tests/tenancy.test.ts`).
 - [ ] Frontend: sign up / sign in, create workspace, switch workspace, invite member
-- [ ] `orgSettings` created with defaults on org creation
+- [x] `orgSettings` created with defaults on org creation (`orgs.create`)
 
 ## Phase 2: Instagram connection (own accounts, Standard Access)
 - [ ] Meta app created and configured (owner; follow `META_SETUP.md`)
