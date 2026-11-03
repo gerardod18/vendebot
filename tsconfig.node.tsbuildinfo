@@ -1,1 +1,1 @@
-{"root":["./vite.config.ts","./vitest.config.ts","./tests/crypto.test.ts","./tests/parse.test.ts","./tests/router.test.ts","./tests/signature.test.ts"],"errors":true,"version":"6.0.3"}
+{"root":["./vite.config.ts","./vitest.config.ts","./tests/crypto.test.ts","./tests/parse.test.ts","./tests/router.test.ts","./tests/signature.test.ts"],"version":"6.0.3"}

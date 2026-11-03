@@ -8,7 +8,6 @@
 - Pure, tested core logic: `instagram/signature.ts`, `instagram/parse.ts`, `lib/crypto.ts`, `engine/router.ts` (24 vitest tests passing).
 - **Not yet run against a real Convex deployment** (the agent sandbox can't reach one). Codegen is stubbed offline, see Known issues.
 - Handoff docs written: `CLAUDE.md`, `docs/PLAN.md`, `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`, `docs/META_SETUP.md`, `docs/RESEARCH.md`.
-- Phase 0 is partly done (see PLAN).
 
 ### Installed versions (pinned by package-lock)
 convex 1.49, @convex-dev/agent 0.7.9, @convex-dev/workflow 0.4.10, @convex-dev/workpool 0.4.15,
@@ -23,12 +22,12 @@ vite 8, typescript 6, tailwindcss 4, vitest 5, convex-test 0.0.67.
 
 ## Next steps (in order)
 1. Owner: run `npx convex dev` once to create or link the Convex deployment (writes `.env.local`).
-3. Phase 1: `lib/tenancy.ts` (orgQuery/orgMutation) + org create/list/switch mutations with convex-test tests; first-org bootstrap + `orgSettings` defaults. Frontend workspace picker.
-4. Owner (in parallel): create the Meta app following `docs/META_SETUP.md` and add their Instagram account as a tester.
-5. Phase 2 → 3 → 4 → 5 as in `PLAN.md`.
+2. Phase 1: `lib/tenancy.ts` (orgQuery/orgMutation) + org create/list/switch mutations with convex-test tests; first-org bootstrap + `orgSettings` defaults. Frontend workspace picker.
+3. Owner (in parallel): create the Meta app following `docs/META_SETUP.md` and add their Instagram account as a tester.
+4. Phase 2 → 3 → 4 → 5 as in `PLAN.md`.
 
 ## Owner actions pending
-- [ ] **Install the Claude GitHub App on `gerardod18/vendebot`** (or reconnect GitHub in claude.ai → Connectors) so agents can push. Until then, commits are only local to the agent session.
+- [x] Claude GitHub App access on `gerardod18/vendebot` (pushes work).
 - [ ] Decide whether the repo should be private (it's currently public; no secrets are committed).
 - [ ] Create a Convex account/deployment (`npx convex dev`).
 - [ ] Create the Meta developer app (see `META_SETUP.md` §1–5).
