@@ -5,7 +5,7 @@
 
 ## Current state (2026-11-03)
 - Phase 0 done: Vite/React/Tailwind skeleton (sign in/up), Convex config with all components, full schema, Better Auth wiring. `tsc -b` and `vite build` pass.
-- Pure, tested core logic: `instagram/signature.ts`, `instagram/parse.ts`, `lib/crypto.ts`, `engine/router.ts` + `lib/tenancy.ts`/`orgs.ts` + `engine/ingest.ts` + `meta.ts` webhook routes (35 vitest tests passing, incl. cross-tenant denial and webhook idempotency).
+- Pure, tested core logic: `instagram/signature.ts`, `instagram/parse.ts`, `lib/crypto.ts`, `engine/router.ts` + `lib/tenancy.ts`/`orgs.ts` + `engine/ingest.ts` + `meta.ts` webhook routes `instagram/client.ts` (41 vitest tests passing, incl. cross-tenant denial and webhook idempotency).
 - **Not yet run against a real Convex deployment** (the agent sandbox can't reach one). Codegen is stubbed offline, see Known issues.
 - Handoff docs written: `CLAUDE.md`, `docs/PLAN.md`, `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`, `docs/META_SETUP.md`, `docs/RESEARCH.md`.
 
@@ -34,6 +34,7 @@ vite 8, typescript 6, tailwindcss 4, vitest 5, convex-test 0.0.67.
 - [ ] Get an Anthropic API key for `ANTHROPIC_API_KEY`.
 
 ## Known issues
+- **`convex/instagram/client.ts` endpoints are UNVERIFIED** (sandbox couldn't reach Meta docs): send path `/{ig-user-id}/messages`, `HUMAN_AGENT` via `messaging_type: MESSAGE_TAG`, token exchange `grant_type=ig_exchange_token`, refresh `ig_refresh_token`, `subscribed_apps`. Verify against Meta docs + a real test account in Phase 2.
 - **`convex/_generated/` is an offline stub** produced by `node scripts/gen-convex-stubs.mjs` (the sandbox can't reach a Convex backend). It exists so `tsc` and tests work offline. Running `npx convex dev` overwrites it with the real generated code. **Re-run the script after adding/removing files in `convex/`** if you are working offline.
 - `src/main.tsx` casts the auth client to the provider's `AuthClient` type (better-auth 1.6.34 plugin-array inference doesn't narrow). Harmless; revisit on upgrade.
 - Webhook payload shapes in `instagram/parse.ts` come from docs/secondary sources, not live traffic. Verify with a real DM/comment/story mention and extend the fixtures in `tests/parse.test.ts`.
