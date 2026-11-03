@@ -5,7 +5,11 @@
  */
 
 import type * as auth from "../auth.js";
+import type * as engine_router from "../engine/router.js";
 import type * as http from "../http.js";
+import type * as instagram_parse from "../instagram/parse.js";
+import type * as instagram_signature from "../instagram/signature.js";
+import type * as lib_crypto from "../lib/crypto.js";
 
 import type { ApiFromModules, FilterApi, FunctionReference } from "convex/server";
 import { anyApi, componentsGeneric } from "convex/server";
@@ -17,7 +21,11 @@ import type { ComponentApi as rateLimiter_api } from "@convex-dev/rate-limiter/_
 
 declare const fullApi: ApiFromModules<{
   "auth": typeof auth;
+  "engine/router": typeof engine_router;
   "http": typeof http;
+  "instagram/parse": typeof instagram_parse;
+  "instagram/signature": typeof instagram_signature;
+  "lib/crypto": typeof lib_crypto;
 }>;
 
 export const api: FilterApi<typeof fullApi, FunctionReference<any, "public">> = anyApi as any;

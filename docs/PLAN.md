@@ -20,21 +20,21 @@ Work top to bottom inside a phase. Each item should be roughly one PR or commit.
 
 ## Phase 2: Instagram connection (own accounts, Standard Access)
 - [ ] Meta app created and configured (owner; follow `META_SETUP.md`)
-- [ ] `convex/lib/crypto.ts` AES-GCM token encryption + tests
+- [x] `convex/lib/crypto.ts` AES-GCM token encryption + tests
 - [ ] OAuth connect flow: "Connect Instagram" button → Instagram Login → `/meta/oauth/callback` → exchange code → long-lived token → save `igAccounts` → subscribe the account to webhook fields (`messages`, `messaging_postbacks`, `comments`, `mentions`)
 - [ ] Accounts page: list, status, disconnect, reconnect
 - [ ] Cron: refresh tokens expiring within 10 days; mark `expired` on failure
 
 ## Phase 3: Webhook pipeline + inbox
 - [ ] `GET /meta/webhook` verification (`hub.mode`, `hub.verify_token`, `hub.challenge`)
-- [ ] `POST /meta/webhook`: signature check (`instagram/signature.ts` + tests), parse (`instagram/parse.ts` + fixture tests), ingest mutation with dedupe
+- [ ] `POST /meta/webhook`: ~~signature check + tests~~ (done), ~~parse + fixture tests~~ (done), **ingest mutation with dedupe + HTTP route still to do**
 - [ ] Contacts + conversations + messages upsert; contact profile fetch (name, username)
 - [ ] Inbox UI: conversation list (live), thread view, send a human reply (uses `HUMAN_AGENT` tag when outside 24h), take over / give back to bot
 - [ ] Rate-limited outbound send helper (per igAccount)
 
 ## Phase 4: Automation engine + templates
 - [ ] `engine/graph.ts` zod schema for the graph (see ARCHITECTURE §5) + validation tests
-- [ ] `engine/router.ts` trigger matching (pure) + tests
+- [x] `engine/router.ts` trigger matching (pure) + tests
 - [ ] `engine/runner.ts` Workflow interpreter: message, quickReplies, card, filter, action, wait, waitForReply, handoff
 - [ ] Templates + forms UI:
   - [ ] Default reply (with business-hours filter → AI or "we'll reply soon")

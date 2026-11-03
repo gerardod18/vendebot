@@ -48,3 +48,11 @@ Short ADR-style entries. Add new ones at the bottom. Don't rewrite old ones; sup
 ## D8: Meta access strategy
 - **Decision:** Develop on **Standard Access** with the owner's own Instagram professional accounts, added as testers or roles on the Meta app. No App Review is needed for that.
 - **Later:** Business Verification + App Review for Advanced Access, needed only before onboarding accounts the owner doesn't control (selling to SMBs). See `META_SETUP.md`.
+
+---
+
+## D9: Tenancy tables are our own (`orgs`, `members`, `invites`), not the Better Auth organization plugin
+- **Date:** 2026-11-03
+- **Decision:** Better Auth is used for **authentication only** (users, sessions). Workspaces live in app-owned Convex tables (`orgs`, `members`, `invites`) and are enforced by `convex/lib/tenancy.ts`.
+- **Why:** The `@convex-dev/better-auth` component's schema has no organization tables (it ships user, session, account, verification, twoFactor, oauth*, jwks, rateLimit). Using the plugin would mean extending the component schema and reading org data across the component boundary in every query. Own tables are simpler to query, index by `orgId`, and test with convex-test.
+- **Supersedes the "organization plugin" part of D3.** Better Auth itself is unchanged. If the plugin is wanted later, migrate `members` to it.
