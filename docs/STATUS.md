@@ -5,7 +5,7 @@
 
 ## Current state (2026-11-03)
 - Phase 0 done: Vite/React/Tailwind skeleton (sign in/up), Convex config with all components, full schema, Better Auth wiring. `tsc -b` and `vite build` pass.
-- Pure, tested core logic: `instagram/signature.ts`, `instagram/parse.ts`, `lib/crypto.ts`, `engine/router.ts` (24 vitest tests passing).
+- Pure, tested core logic: `instagram/signature.ts`, `instagram/parse.ts`, `lib/crypto.ts`, `engine/router.ts` + `lib/tenancy.ts`/`orgs.ts` (30 vitest tests passing, incl. cross-tenant denial).
 - **Not yet run against a real Convex deployment** (the agent sandbox can't reach one). Codegen is stubbed offline, see Known issues.
 - Handoff docs written: `CLAUDE.md`, `docs/PLAN.md`, `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`, `docs/META_SETUP.md`, `docs/RESEARCH.md`.
 
@@ -22,7 +22,7 @@ vite 8, typescript 6, tailwindcss 4, vitest 5, convex-test 0.0.67.
 
 ## Next steps (in order)
 1. Owner: run `npx convex dev` once to create or link the Convex deployment (writes `.env.local`).
-2. Phase 1: `lib/tenancy.ts` (orgQuery/orgMutation) + org create/list/switch mutations with convex-test tests; first-org bootstrap + `orgSettings` defaults. Frontend workspace picker.
+2. Phase 1 remainder: frontend workspace picker (create/switch workspace) and invites (`invites` table exists, no functions yet). Then Phase 3: `/meta/webhook` HTTP route + ingest mutation (dedupe by `webhookEvents.dedupeKey`).
 3. Owner (in parallel): create the Meta app following `docs/META_SETUP.md` and add their Instagram account as a tester.
 4. Phase 2 → 3 → 4 → 5 as in `PLAN.md`.
 
