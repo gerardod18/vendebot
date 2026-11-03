@@ -30,7 +30,8 @@ Work top to bottom inside a phase. Each item should be roughly one PR or commit.
 - [x] `POST /meta/webhook`: signature check, parse, `engine/ingest.ts` ingest mutation with dedupe (HTTP route in `meta.ts`). **Still TODO: enqueue processing on the `eventPool` Workpool** (see TODO in `meta.ts`).
 - [x] Contacts + conversations + messages upsert (in `ingest.ts`). **TODO: contact profile fetch (name, username) via Graph API.**
 - [ ] Inbox UI: conversation list (live), thread view, send a human reply (uses `HUMAN_AGENT` tag when outside 24h), take over / give back to bot
-- [ ] Rate-limited outbound send helper (per igAccount)
+- [x] Instagram Graph client `instagram/client.ts` (send DM/private reply/quick replies, HUMAN_AGENT tag, profile, subscribe, token exchange/refresh) with injectable fetch + tests. **UNVERIFIED against live Meta API.**
+- [ ] Rate-limited outbound send helper (per igAccount, uses the Rate Limiter component)
 
 ## Phase 4: Automation engine + templates
 - [ ] `engine/graph.ts` zod schema for the graph (see ARCHITECTURE §5) + validation tests

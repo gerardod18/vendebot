@@ -8,6 +8,7 @@ import type * as auth from "../auth.js";
 import type * as engine_ingest from "../engine/ingest.js";
 import type * as engine_router from "../engine/router.js";
 import type * as http from "../http.js";
+import type * as instagram_client from "../instagram/client.js";
 import type * as instagram_parse from "../instagram/parse.js";
 import type * as instagram_signature from "../instagram/signature.js";
 import type * as lib_crypto from "../lib/crypto.js";
@@ -28,6 +29,7 @@ declare const fullApi: ApiFromModules<{
   "engine/ingest": typeof engine_ingest;
   "engine/router": typeof engine_router;
   "http": typeof http;
+  "instagram/client": typeof instagram_client;
   "instagram/parse": typeof instagram_parse;
   "instagram/signature": typeof instagram_signature;
   "lib/crypto": typeof lib_crypto;
