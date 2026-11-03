@@ -5,7 +5,7 @@
 
 ## Current state (2026-11-03)
 - Phase 0 done: Vite/React/Tailwind skeleton (sign in/up), Convex config with all components, full schema, Better Auth wiring. `tsc -b` and `vite build` pass.
-- Pure, tested core logic: `instagram/signature.ts`, `instagram/parse.ts`, `lib/crypto.ts`, `engine/router.ts` + `lib/tenancy.ts`/`orgs.ts` + `engine/ingest.ts` + `meta.ts` webhook routes `instagram/client.ts` (41 vitest tests passing, incl. cross-tenant denial and webhook idempotency).
+- Pure, tested core logic: `instagram/signature.ts`, `instagram/parse.ts`, `lib/crypto.ts`, `engine/router.ts` + `lib/tenancy.ts`/`orgs.ts` + `engine/ingest.ts` + `meta.ts` webhook routes `instagram/client.ts` `engine/graph.ts` + `engine/interpreter.ts` + `engine/templates.ts` (59 vitest tests passing, incl. cross-tenant denial and webhook idempotency).
 - **Not yet run against a real Convex deployment** (the agent sandbox can't reach one). Codegen is stubbed offline, see Known issues.
 - Handoff docs written: `CLAUDE.md`, `docs/PLAN.md`, `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`, `docs/META_SETUP.md`, `docs/RESEARCH.md`.
 
@@ -22,7 +22,7 @@ vite 8, typescript 6, tailwindcss 4, vitest 5, convex-test 0.0.67.
 
 ## Next steps (in order)
 1. Owner: run `npx convex dev` once to create or link the Convex deployment (writes `.env.local`).
-2. Phase 1 remainder: frontend workspace picker (create/switch workspace) and invites (`invites` table exists, no functions yet). Then: Instagram Graph client (`convex/instagram/client.ts`: send text/quick replies, profile fetch), inbox queries + human send, and the Phase 4 flow runner (the webhook route currently only stores events; processing is a TODO in `meta.ts`).
+2. Phase 1 remainder: frontend workspace picker (create/switch workspace) and invites (`invites` table exists, no functions yet). Then, in this order: (a) `automations.ts` CRUD (TemplateConfig → flow + flowVersion + trigger, validated by `buildGraph`), (b) `engine/runner.ts` Workflow wrapper executing interpreter effects + the event processor wired from `meta.ts` (route → run), (c) outbound send helper with Rate Limiter + token decryption, (d) inbox queries/human send/takeover, (e) AI node via Convex Agent (Phase 5), (f) frontend pages.
 3. Owner (in parallel): create the Meta app following `docs/META_SETUP.md` and add their Instagram account as a tester.
 4. Phase 2 → 3 → 4 → 5 as in `PLAN.md`.
 
