@@ -55,6 +55,8 @@ Work top to bottom inside a phase. Each item should be roughly one PR or commit.
 - [ ] Quota (`ai/quota.ts`) + usage tracking + Usage page
 - [ ] Knowledge page (FAQ / product text per org)
 - [ ] Optional BYO Anthropic key per org (encrypted)
+- [x] OpenRouter provider + per-org provider/model selection (`ai/models.ts`, `ai/provider.ts`, `orgs.setAiConfig`)
+- [ ] Settings UI for AI provider/model/key; per-model pricing in usage tracking
 
 ## Phase 6: Hardening for real customers
 - [ ] Privacy policy, terms, **data deletion callback** endpoint (`/meta/data-deletion`) + deauthorize callback

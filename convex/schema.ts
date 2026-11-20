@@ -72,7 +72,9 @@ export default defineSchema({
     plan: v.string(),
     aiModel: v.string(),
     aiMonthlyQuota: v.number(),
+    aiProvider: v.optional(v.union(v.literal("anthropic"), v.literal("openrouter"))), // default anthropic
     byoAnthropicKeyEnc: v.optional(v.string()),
+    byoOpenRouterKeyEnc: v.optional(v.string()),
     timezone: v.string(),
     businessHours: v.object({
       days: v.array(v.number()), // 0 = Sunday ... 6 = Saturday

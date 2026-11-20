@@ -35,6 +35,7 @@ Short ADR-style entries. Add new ones at the bottom. Don't rewrite old ones; sup
   | Opus 5.5 | $4 | $20 |
 
   A typical reply of about 3k input + 250 output tokens costs roughly $0.0005–0.001 on Haiku 5.5 and $0.01–0.02 on Sonnet 5.5.
+- **OpenRouter (added 2026-11-20):** orgs can pick `aiProvider: "openrouter"` and any OpenRouter slug (`openai/gpt-5-mini`, `google/gemini-2.5-flash`, ...) via `@openrouter/ai-sdk-provider`. Key precedence: org BYO key, then platform `OPENROUTER_API_KEY`. Cost/quota metering for non-Claude models must use per-model prices (OpenRouter reports usage cost); the table above only covers Anthropic.
 - **Guardrails:** per-org monthly AI quota (Rate Limiter + `usage` table), with a fallback branch when it's exceeded (as SendPulse does). Optional bring-your-own Anthropic key per org (stored encrypted). Prompt caching for system prompt and knowledge. Short history window.
 
 ## D6: Durable execution and fairness: Convex Workflow + Workpool + Rate Limiter
