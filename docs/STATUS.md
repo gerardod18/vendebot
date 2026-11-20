@@ -3,11 +3,13 @@
 > **Every agent: read this first and update it before you stop.**
 > Format: keep "Current state", "Next steps" and "Known issues" accurate; append to the log at the bottom.
 
-## Current state (2026-11-03)
-- Phase 0 done: Vite/React/Tailwind skeleton (sign in/up), Convex config with all components, full schema, Better Auth wiring. `tsc -b` and `vite build` pass.
-- Pure, tested core logic: `instagram/signature.ts`, `instagram/parse.ts`, `lib/crypto.ts`, `engine/router.ts` + `lib/tenancy.ts`/`orgs.ts` + `engine/ingest.ts` + `meta.ts` webhook routes `instagram/client.ts` `engine/graph.ts` + `engine/interpreter.ts` + `engine/templates.ts` `automations.ts` (63 vitest tests passing, incl. cross-tenant denial and webhook idempotency).
-- **Not yet run against a real Convex deployment** (the agent sandbox can't reach one). Codegen is stubbed offline, see Known issues.
-- Handoff docs written: `CLAUDE.md`, `docs/PLAN.md`, `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`, `docs/META_SETUP.md`, `docs/RESEARCH.md`.
+## Current state (2026-11-20)
+- **All code phases are implemented and tested offline** (98 vitest tests, `tsc -b` and `vite build` pass). What's left is owner-only (accounts, Meta review, billing provider) and verifying against live services.
+- Backend (Convex): auth + tenancy, workspaces/invites/settings, Instagram OAuth connect + token refresh cron, webhook ingest (idempotent) → `engine/runner.ts` (pure interpreter + scheduler timeouts) → `outbound.ts` (24h/7-day window, retries), inbox (takeover / human reply), AI agent node (`ai/agent.ts`, tools, quota, usage, Anthropic or OpenRouter, BYO key), knowledge, usage, privacy callbacks (data deletion, deauthorize), retention cron, failed-run admin queries, plan → quota (`billing.applyPlan` + signed webhook).
+- Frontend (React): sign in/up, workspace create/switch, setup checklist, Instagram accounts, automations (5 template forms), live inbox, knowledge, usage, settings (AI provider/model/key, business hours, instructions, team + invite links), errors, public privacy/terms/deletion-status pages.
+- CI workflow in `.github/workflows/ci.yml`.
+- **Never run against a real Convex deployment or real Meta.** Codegen is stubbed offline (see Known issues). The frontend was type-checked and built but not exercised in a browser against a backend.
+- Docs: `CLAUDE.md`, `PLAN`, `ARCHITECTURE`, `DECISIONS` (D10 explains the scheduler-based runner), `META_SETUP`, `RESEARCH`.
 
 ### Installed versions (pinned by package-lock)
 convex 1.49, @convex-dev/agent 0.7.9, @convex-dev/workflow 0.4.10, @convex-dev/workpool 0.4.15,
@@ -21,12 +23,11 @@ vite 8, typescript 6, tailwindcss 4, vitest 5, convex-test 0.0.67.
 > write APIs from memory.
 
 ## Next steps (in order)
-1. Owner: run `npx convex dev` once to create or link the Convex deployment (writes `.env.local`).
-2. Phase 1 remainder: frontend workspace picker (create/switch workspace) and invites (`invites` table exists, no functions yet). Then, in this order: (a) ~~`automations.ts` CRUD~~ (done), (b) `engine/runner.ts` Workflow wrapper executing interpreter effects + the event processor wired from `meta.ts` (route → run), (c) outbound send helper with Rate Limiter + token decryption, (d) inbox queries/human send/takeover, (e) AI node via Convex Agent (Phase 5), (f) frontend pages.
-3. Owner (in parallel): create the Meta app following `docs/META_SETUP.md` and add their Instagram account as a tester.
-4. Phase 2 → 3 → 4 → 5 as in `PLAN.md`.
-
-> **Why the runner/AI/frontend aren't done:** they need a live Convex deployment to develop against (Workflow/Agent components, generated types, realtime UI). The agent sandbox couldn't reach Convex, so everything built so far is the part verifiable offline (pure logic + convex-test). Pick up (b)–(f) in a session where `npx convex dev` works.
+1. Owner: `npx convex dev` (creates the deployment, replaces the stub `_generated`). Fix any type errors it surfaces (the components' real generated types may differ from the stubs).
+2. Owner: create the Meta app (`META_SETUP.md`), set env vars (below), add your Instagram account as a tester, connect it from the Instagram page and send a DM from another account. **Verify the UNVERIFIED Graph endpoints** listed in Known issues.
+3. Run the frontend with `npm run dev` and click through every page once (it has only been type-checked).
+4. Before onboarding real customers: Business Verification + App Review, lawyer review of `/privacy` and `/terms`, Stripe/Polar adapter calling `billing.applyPlan`, error monitoring (Sentry), email delivery for invites.
+5. "Later" list in `PLAN.md` (visual builder, catalog tools, WhatsApp, web chat, broadcasts).
 
 ## Owner actions pending
 - [ ] Optional: `OPENROUTER_API_KEY` for the OpenRouter provider.
@@ -34,9 +35,18 @@ vite 8, typescript 6, tailwindcss 4, vitest 5, convex-test 0.0.67.
 - [ ] Decide whether the repo should be private (it's currently public; no secrets are committed).
 - [ ] Create a Convex account/deployment (`npx convex dev`).
 - [ ] Create the Meta developer app (see `META_SETUP.md` §1–5).
-- [ ] Get an Anthropic API key for `ANTHROPIC_API_KEY`.
+- [ ] Get an Anthropic API key for `ANTHROPIC_API_KEY` (and/or `OPENROUTER_API_KEY`).
+- [ ] Set Convex env vars: `SITE_URL` (frontend URL), `BETTER_AUTH_SECRET`, `META_APP_ID`, `META_APP_SECRET`, `META_WEBHOOK_VERIFY_TOKEN`, `META_GRAPH_VERSION`, `TOKEN_ENCRYPTION_KEY`, `ANTHROPIC_API_KEY`, optional `OPENROUTER_API_KEY`, optional `BILLING_WEBHOOK_SECRET`. (`CONVEX_SITE_URL` is provided by Convex.)
+- [ ] Meta app: register `<site>/meta/oauth/callback`, `<site>/meta/data-deletion`, `<site>/meta/deauthorize`, and the privacy/terms URLs (`<app>/privacy`, `<app>/terms`).
+- [ ] Meta Business Verification + App Review (Advanced Access).
+- [ ] Choose and connect a billing provider (Stripe/Polar).
+- [ ] Have `/privacy` and `/terms` (drafts in `src/pages/Public.tsx`) reviewed by a lawyer.
 
 ## Known issues
+- **Also UNVERIFIED (same reason):** OAuth endpoints in `instagram/oauth.ts` (authorize URL, `api.instagram.com/oauth/access_token`, `/me` fields), public comment reply `POST /{comment-id}/replies`, the `signed_request` user id semantics for deletion/deauthorize, and the 24h / 7-day window numbers.
+- **Rate limiting:** no per-account send throttle (D10); only retry/backoff on Meta rate-limit errors.
+- **Invites** are copyable links (no email sent). **Billing** has no provider adapter yet.
+- `deleteSubjectData` matches contacts by Instagram-scoped id only; verify what id Meta sends in the deletion callback.
 - **`convex/instagram/client.ts` endpoints are UNVERIFIED** (sandbox couldn't reach Meta docs): send path `/{ig-user-id}/messages`, `HUMAN_AGENT` via `messaging_type: MESSAGE_TAG`, token exchange `grant_type=ig_exchange_token`, refresh `ig_refresh_token`, `subscribed_apps`. Verify against Meta docs + a real test account in Phase 2.
 - **`convex/_generated/` is an offline stub** produced by `node scripts/gen-convex-stubs.mjs` (the sandbox can't reach a Convex backend). It exists so `tsc` and tests work offline. Running `npx convex dev` overwrites it with the real generated code. **Re-run the script after adding/removing files in `convex/`** if you are working offline.
 - `src/main.tsx` casts the auth client to the provider's `AuthClient` type (better-auth 1.6.34 plugin-array inference doesn't narrow). Harmless; revisit on upgrade.
@@ -45,6 +55,7 @@ vite 8, typescript 6, tailwindcss 4, vitest 5, convex-test 0.0.67.
 - The cloud agent sessions that created this repo couldn't reach developers.facebook.com, tanstack.com or docs.convex.dev (network policy). Meta details in the docs come from secondary sources; verify them when you have access.
 
 ## Log
+- 2026-11-20: Implemented every remaining code phase: runner (D10), outbound, AI agent + quota/usage, inbox, OAuth + token cron, accounts/knowledge/usage/settings/invites, privacy callbacks + retention + failed-run views, billing hook, full React UI, CI. 98 tests.
 - 2026-11-20: Added OpenRouter support: `ai/models.ts` (pure resolution + model id validation), `ai/provider.ts` (AI SDK factory, BYO key decrypt), schema `aiProvider`/`byoOpenRouterKeyEnc`, `orgs.setAiConfig`. Dep `@openrouter/ai-sdk-provider` 3.1.0. 69 tests. `provider.ts` is not exercised by tests (needs live keys). Agent node must call `getLanguageModel`.
 - 2026-11-03: Added Graph client, flow graph/interpreter/templates, automations CRUD. 63 tests. Pushed after each milestone (conventional commits).
 - 2026-11-03: Phase 0 scaffold + pure core (signature, parser, crypto, router) with tests. Decision D9 (own org tables).
