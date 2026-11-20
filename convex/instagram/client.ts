@@ -101,6 +101,12 @@ export function createIgClient(cfg: IgClientConfig) {
       return { messageId: json.message_id, recipientId: json.recipient_id };
     },
 
+    /** Public reply under a comment. ⚠ UNVERIFIED path/params (POST /{comment-id}/replies?message=). */
+    async replyToComment(commentId: string, text: string) {
+      if (!text || text.length > 2200) throw new Error("reply text must be 1-2200 characters");
+      return call(`/${commentId}/replies`, { method: "POST", query: { message: text } });
+    },
+
     /** Basic profile of a contact who messaged us (name/username). */
     async getContactProfile(igsid: string): Promise<{ name?: string; username?: string; profilePic?: string }> {
       const json = await call(`/${igsid}`, { method: "GET", query: { fields: "name,username,profile_pic" } });

@@ -213,13 +213,28 @@ export default defineSchema({
       v.literal("cancelled"),
     ),
     currentNodeId: v.optional(v.string()),
-    waitingFor: v.optional(v.union(v.literal("reply"), v.literal("ai"))),
+    waitingFor: v.optional(v.union(v.literal("reply"), v.literal("ai"), v.literal("timer"))),
+    /** Bumped on every wait so stale scheduled timeouts are ignored. */
+    waitSeq: v.optional(v.number()),
+    /** comment-to-DM: first send goes out as a private reply to this comment. */
+    replyToCommentId: v.optional(v.string()),
+    /** AI turn in progress (ms epoch). Prevents two concurrent AI replies for one run. */
+    aiLockUntil: v.optional(v.number()),
     vars: v.record(v.string(), v.string()),
     error: v.optional(v.string()),
     endedAt: v.optional(v.number()),
   })
     .index("by_conversation_status", ["conversationId", "status"])
     .index("by_org", ["orgId"]),
+
+  notes: defineTable({
+    orgId: v.id("orgs"),
+    conversationId: v.id("conversations"),
+    contactId: v.id("contacts"),
+    text: v.string(),
+    author: v.string(), // user id, "bot" or "ai"
+    createdAt: v.number(),
+  }).index("by_conversation", ["conversationId", "createdAt"]),
 
   // ---- AI ----
   knowledge: defineTable({
