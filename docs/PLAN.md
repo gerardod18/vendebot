@@ -10,60 +10,60 @@ Work top to bottom inside a phase. Each item should be roughly one PR or commit.
 - [x] `convex/convex.config.ts` registering components: agent, workflow, workpool (`eventPool`), rateLimiter, betterAuth
 - [ ] `npx convex dev` linked to a deployment (owner runs this locally; needs a Convex login)
 - [x] vitest + convex-test configured (`vitest.config.ts`, edge-runtime)
-- [ ] CI (GitHub Actions): `npm ci`, typecheck, test
+- [x] CI (GitHub Actions): `npm ci`, typecheck, test
 
 ## Phase 1: Auth + tenancy
 - [x] Better Auth via `@convex-dev/better-auth` (email + password) wired in `convex/auth.ts` + `http.ts`. Org plugin NOT used (see D9). Google sign-in later.
 - [x] `convex/lib/tenancy.ts`: `orgQuery` / `orgMutation` / `orgAdminMutation` wrappers (identity → member → role). Tests prove cross-org access is denied (`tests/tenancy.test.ts`).
-- [ ] Frontend: sign up / sign in, create workspace, switch workspace, invite member
+- [x] Frontend: sign up / sign in, create workspace, switch workspace, invite member (invite is a copyable link; no email delivery)
 - [x] `orgSettings` created with defaults on org creation (`orgs.create`)
 
 ## Phase 2: Instagram connection (own accounts, Standard Access)
 - [ ] Meta app created and configured (owner; follow `META_SETUP.md`)
 - [x] `convex/lib/crypto.ts` AES-GCM token encryption + tests
-- [ ] OAuth connect flow: "Connect Instagram" button → Instagram Login → `/meta/oauth/callback` → exchange code → long-lived token → save `igAccounts` → subscribe the account to webhook fields (`messages`, `messaging_postbacks`, `comments`, `mentions`)
-- [ ] Accounts page: list, status, disconnect, reconnect
-- [ ] Cron: refresh tokens expiring within 10 days; mark `expired` on failure
+- [x] OAuth connect flow: "Connect Instagram" button → Instagram Login → `/meta/oauth/callback` → exchange code → long-lived token → save `igAccounts` → subscribe the account to webhook fields (`messages`, `messaging_postbacks`, `comments`, `mentions`)
+- [x] Accounts page: list, status, disconnect, reconnect
+- [x] Cron: refresh tokens expiring within 10 days; mark `expired` on failure
 
 ## Phase 3: Webhook pipeline + inbox
 - [x] `GET /meta/webhook` verification (`convex/meta.ts`, route in `http.ts`)
 - [x] `POST /meta/webhook`: signature check, parse, `engine/ingest.ts` ingest mutation with dedupe (HTTP route in `meta.ts`). **Still TODO: enqueue processing on the `eventPool` Workpool** (see TODO in `meta.ts`).
 - [x] Contacts + conversations + messages upsert (in `ingest.ts`). **TODO: contact profile fetch (name, username) via Graph API.**
-- [ ] Inbox UI: conversation list (live), thread view, send a human reply (uses `HUMAN_AGENT` tag when outside 24h), take over / give back to bot
+- [x] Inbox UI: conversation list (live), thread view, send a human reply (uses `HUMAN_AGENT` tag when outside 24h), take over / give back to bot
 - [x] Instagram Graph client `instagram/client.ts` (send DM/private reply/quick replies, HUMAN_AGENT tag, profile, subscribe, token exchange/refresh) with injectable fetch + tests. **UNVERIFIED against live Meta API.**
-- [ ] Rate-limited outbound send helper (per igAccount, uses the Rate Limiter component)
+- [x] Outbound send helper (`outbound.ts`): window check, token decrypt, retry/backoff on rate limits. No per-account throttle (D10).
 
 ## Phase 4: Automation engine + templates
 - [x] `engine/graph.ts` zod schema + `validateGraph` (ports, reachability, filter yes/no) + tests
 - [x] `engine/router.ts` trigger matching (pure) + tests
 - [x] **Pure interpreter** `engine/interpreter.ts` (`step()` state machine returning effects) + tests. Node types done: message, quickReplies, filter, action, wait, waitForReply, aiAgent, handoff. (`card`/carousel not implemented.)
-- [ ] **`engine/runner.ts`: Convex Workflow wrapper** that calls `step()`, executes the effects durably (send via IG client, tag/field/note mutations, http, scheduleTimeout → resume input), persists `flowRuns`, and is started from the webhook processor (routeEvent → flow). Not started.
+- [x] **`engine/runner.ts`: Convex Workflow wrapper** that calls `step()`, executes the effects durably (send via IG client, tag/field/note mutations, http, scheduleTimeout → resume input), persists `flowRuns`, and is started from the webhook processor (routeEvent → flow). Not started.
 - [x] Template builders `engine/templates.ts` (keywordReply, welcome, defaultReply w/ optional AI + business-hours filter, commentToDm, storyMention).
 - [x] CRUD `automations.ts` (create flow+version+trigger from a TemplateConfig, list, setEnabled, remove) + tests.
-- [ ] Templates forms UI (React):
-  - [ ] Default reply (with business-hours filter → AI or "we'll reply soon")
-  - [ ] Keyword reply
-  - [ ] Welcome message
-  - [ ] Comment-to-DM (private reply + optional public reply)
-  - [ ] Story mention reply
-- [ ] Automations page: list, enable/disable, edit via form, per-trigger stats (sent count)
+- [x] Templates forms UI (React):
+  - [x] Default reply (with business-hours filter → AI or "we'll reply soon")
+  - [x] Keyword reply
+  - [x] Welcome message
+  - [x] Comment-to-DM (private reply + optional public reply)
+  - [x] Story mention reply
+- [x] Automations page: list, enable/disable, edit via form, per-trigger stats (sent count)
 
 ## Phase 5: AI agent node
-- [ ] `ai/agent.ts`: Convex Agent with Claude (`claude-haiku-5-5` default), system prompt = org instructions + node instructions + knowledge
-- [ ] Tools: `handoff_to_human`, `exit_flow`, `save_lead_field`
-- [ ] `aiAgent` node loop with exit / timeout / quota ports
-- [ ] Quota (`ai/quota.ts`) + usage tracking + Usage page
-- [ ] Knowledge page (FAQ / product text per org)
-- [ ] Optional BYO Anthropic key per org (encrypted)
+- [x] `ai/agent.ts`: AI SDK agent (not the Convex Agent component, see D10) with Claude (`claude-haiku-5-5` default), system prompt = org instructions + node instructions + knowledge
+- [x] Tools: `handoff_to_human`, `exit_flow`, `save_lead_field`
+- [x] `aiAgent` node loop with exit / timeout / quota ports
+- [x] Quota (`ai/quota.ts`) + usage tracking + Usage page
+- [x] Knowledge page (FAQ / product text per org)
+- [x] Optional BYO Anthropic key per org (encrypted)
 - [x] OpenRouter provider + per-org provider/model selection (`ai/models.ts`, `ai/provider.ts`, `orgs.setAiConfig`)
-- [ ] Settings UI for AI provider/model/key; per-model pricing in usage tracking
+- [x] Settings UI for AI provider/model/key; per-model pricing in usage tracking
 
 ## Phase 6: Hardening for real customers
-- [ ] Privacy policy, terms, **data deletion callback** endpoint (`/meta/data-deletion`) + deauthorize callback
+- [x] Privacy policy + terms pages (**DRAFTS, have a lawyer review and fill the [brackets]**), data deletion callback (`/meta/data-deletion`) + status page, deauthorize callback (`/meta/deauthorize`)
 - [ ] Meta Business Verification (owner) + App Review screencasts for `instagram_business_basic`, `instagram_business_manage_messages`, `instagram_business_manage_comments`
-- [ ] Error monitoring, webhook event retention cron, admin view of failed runs
-- [ ] Billing (Stripe or Polar), plans → `aiMonthlyQuota`
-- [ ] Onboarding wizard for non-technical small businesses (Spanish-first copy)
+- [x] Webhook event retention cron + admin "Errores" view of failed runs. **Still TODO: external error monitoring (Sentry etc., needs an account).**
+- [ ] Billing (Stripe or Polar), plans → `aiMonthlyQuota`. **Done:** plans table (`lib/plans.ts`), `billing.applyPlan`, signed `/billing/webhook`. **Missing:** the actual Stripe/Polar adapter + checkout UI (needs the owner's account).
+- [x] Onboarding: guided Spanish setup checklist on the home page (workspace → Instagram → first automation → knowledge → assistant style)
 
 ## Later / ideas
 - Visual flow builder (React Flow / xyflow) on the existing graph format
