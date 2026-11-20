@@ -123,7 +123,8 @@ export default defineSchema({
     firstSeenAt: v.number(),
   })
     .index("by_org", ["orgId"])
-    .index("by_account_igsid", ["igAccountId", "igsid"]),
+    .index("by_account_igsid", ["igAccountId", "igsid"])
+    .index("by_igsid", ["igsid"]),
 
   conversations: defineTable({
     orgId: v.id("orgs"),
@@ -225,7 +226,17 @@ export default defineSchema({
     endedAt: v.optional(v.number()),
   })
     .index("by_conversation_status", ["conversationId", "status"])
+    .index("by_endedAt", ["endedAt"])
     .index("by_org", ["orgId"]),
+
+  /** Meta data-deletion callback requests (status page shows `status` by `code`). */
+  deletionRequests: defineTable({
+    code: v.string(),
+    subjectId: v.string(),
+    requestedAt: v.number(),
+    status: v.union(v.literal("completed"), v.literal("nothing_found")),
+    deletedContacts: v.number(),
+  }).index("by_code", ["code"]),
 
   notes: defineTable({
     orgId: v.id("orgs"),

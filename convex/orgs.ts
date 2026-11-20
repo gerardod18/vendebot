@@ -3,7 +3,7 @@ import type { Doc } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
 import { DEFAULT_PROVIDER, validateModelId } from "./ai/models";
 import { encryptSecret } from "./lib/crypto";
-import { orgAdminMutation, orgQuery, requireUserId } from "./lib/tenancy";
+import { orgAdminMutation, orgAdminQuery, orgQuery, requireUserId } from "./lib/tenancy";
 import { roleValidator } from "./schema";
 
 export const DEFAULT_SETTINGS = {
@@ -134,5 +134,97 @@ export const setMemberRole = orgAdminMutation({
     if (!target) throw new Error("Member not found");
     if (target.role === "owner" || role === "owner") throw new Error("Owner role cannot be changed here");
     await ctx.db.patch(target._id, { role });
+  },
+});
+
+/** Workspace preferences: timezone, business hours, language and the business-wide AI instructions. */
+export const updateSettings = orgAdminMutation({
+  args: {
+    timezone: v.optional(v.string()),
+    businessHours: v.optional(v.object({ days: v.array(v.number()), start: v.string(), end: v.string() })),
+    defaultLanguage: v.optional(v.string()),
+    aiInstructions: v.optional(v.string()),
+  },
+  handler: async (ctx, a) => {
+    const s = await ctx.db.query("orgSettings").withIndex("by_org", (q) => q.eq("orgId", ctx.orgId)).unique();
+    if (!s) throw new Error("Settings not found");
+    const patch: Partial<Doc<"orgSettings">> = {};
+    if (a.timezone !== undefined) {
+      try { new Intl.DateTimeFormat("en-US", { timeZone: a.timezone }); } catch { throw new Error("Invalid timezone"); }
+      patch.timezone = a.timezone;
+    }
+    if (a.businessHours) {
+      const hhmm = /^([01]\d|2[0-3]):[0-5]\d$/;
+      if (!hhmm.test(a.businessHours.start) || !hhmm.test(a.businessHours.end)) throw new Error("Hours must be HH:MM");
+      if (a.businessHours.days.some((d) => !Number.isInteger(d) || d < 0 || d > 6)) throw new Error("Days must be 0-6");
+      patch.businessHours = a.businessHours;
+    }
+    if (a.defaultLanguage !== undefined) {
+      if (!/^[a-z]{2}$/.test(a.defaultLanguage)) throw new Error("Language must be a 2-letter code");
+      patch.defaultLanguage = a.defaultLanguage;
+    }
+    if (a.aiInstructions !== undefined) {
+      if (a.aiInstructions.length > 4000) throw new Error("AI instructions are limited to 4000 characters");
+      patch.aiInstructions = a.aiInstructions.trim() || undefined;
+    }
+    await ctx.db.patch(s._id, patch);
+  },
+});
+
+// ---- Invites ----
+const INVITE_TTL_MS = 7 * 24 * 3600_000;
+
+export const invite = orgAdminMutation({
+  args: { email: v.string(), role: roleValidator },
+  handler: async (ctx, { email, role }) => {
+    const e = email.trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) throw new Error("Invalid email");
+    if (role === "owner") throw new Error("Invite as admin or agent");
+    const bytes = crypto.getRandomValues(new Uint8Array(24));
+    const token = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+    await ctx.db.insert("invites", { orgId: ctx.orgId, email: e, role, token, invitedBy: ctx.userId, expiresAt: Date.now() + INVITE_TTL_MS });
+    return { token }; // share as <app>/invite/<token>; email delivery is not wired up
+  },
+});
+
+export const listInvites = orgAdminQuery({
+  args: {},
+  handler: async (ctx) => {
+    const rows = await ctx.db.query("invites").withIndex("by_org", (q) => q.eq("orgId", ctx.orgId)).collect();
+    return rows.filter((i) => !i.acceptedAt && i.expiresAt > Date.now()).map((i) => ({ id: i._id, email: i.email, role: i.role, token: i.token, expiresAt: i.expiresAt }));
+  },
+});
+
+export const revokeInvite = orgAdminMutation({
+  args: { inviteId: v.id("invites") },
+  handler: async (ctx, { inviteId }) => {
+    const i = await ctx.db.get(inviteId);
+    if (!i || i.orgId !== ctx.orgId) throw new Error("Invite not found");
+    await ctx.db.delete(inviteId);
+  },
+});
+
+/** Accept an invite as the signed-in user. The token is the secret; it is single use and expires. */
+export const acceptInvite = mutation({
+  args: { token: v.string() },
+  handler: async (ctx, { token }) => {
+    const userId = await requireUserId(ctx);
+    const inv = await ctx.db.query("invites").withIndex("by_token", (q) => q.eq("token", token)).unique();
+    if (!inv || inv.acceptedAt || inv.expiresAt < Date.now()) throw new Error("Invite is invalid or expired");
+    const existing = await ctx.db.query("members").withIndex("by_org_user", (q) => q.eq("orgId", inv.orgId).eq("userId", userId)).unique();
+    if (!existing) await ctx.db.insert("members", { orgId: inv.orgId, userId, role: inv.role });
+    await ctx.db.patch(inv._id, { acceptedAt: Date.now() });
+    return inv.orgId;
+  },
+});
+
+export const removeMember = orgAdminMutation({
+  args: { memberUserId: v.string() },
+  handler: async (ctx, { memberUserId }) => {
+    const target = await ctx.db.query("members").withIndex("by_org_user", (q) => q.eq("orgId", ctx.orgId).eq("userId", memberUserId)).unique();
+    if (!target) throw new Error("Member not found");
+    if (target.role === "owner") throw new Error("The owner cannot be removed");
+    if (target.role === "admin" && ctx.role !== "owner") throw new Error("Only the owner can remove an admin");
+    await ctx.db.delete(target._id);
   },
 });
