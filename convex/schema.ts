@@ -72,7 +72,9 @@ export default defineSchema({
     plan: v.string(),
     aiModel: v.string(),
     aiMonthlyQuota: v.number(),
+    aiProvider: v.optional(v.union(v.literal("anthropic"), v.literal("openrouter"))), // default anthropic
     byoAnthropicKeyEnc: v.optional(v.string()),
+    byoOpenRouterKeyEnc: v.optional(v.string()),
     timezone: v.string(),
     businessHours: v.object({
       days: v.array(v.number()), // 0 = Sunday ... 6 = Saturday
@@ -121,7 +123,8 @@ export default defineSchema({
     firstSeenAt: v.number(),
   })
     .index("by_org", ["orgId"])
-    .index("by_account_igsid", ["igAccountId", "igsid"]),
+    .index("by_account_igsid", ["igAccountId", "igsid"])
+    .index("by_igsid", ["igsid"]),
 
   conversations: defineTable({
     orgId: v.id("orgs"),
@@ -211,13 +214,38 @@ export default defineSchema({
       v.literal("cancelled"),
     ),
     currentNodeId: v.optional(v.string()),
-    waitingFor: v.optional(v.union(v.literal("reply"), v.literal("ai"))),
+    waitingFor: v.optional(v.union(v.literal("reply"), v.literal("ai"), v.literal("timer"))),
+    /** Bumped on every wait so stale scheduled timeouts are ignored. */
+    waitSeq: v.optional(v.number()),
+    /** comment-to-DM: first send goes out as a private reply to this comment. */
+    replyToCommentId: v.optional(v.string()),
+    /** AI turn in progress (ms epoch). Prevents two concurrent AI replies for one run. */
+    aiLockUntil: v.optional(v.number()),
     vars: v.record(v.string(), v.string()),
     error: v.optional(v.string()),
     endedAt: v.optional(v.number()),
   })
     .index("by_conversation_status", ["conversationId", "status"])
+    .index("by_endedAt", ["endedAt"])
     .index("by_org", ["orgId"]),
+
+  /** Meta data-deletion callback requests (status page shows `status` by `code`). */
+  deletionRequests: defineTable({
+    code: v.string(),
+    subjectId: v.string(),
+    requestedAt: v.number(),
+    status: v.union(v.literal("completed"), v.literal("nothing_found")),
+    deletedContacts: v.number(),
+  }).index("by_code", ["code"]),
+
+  notes: defineTable({
+    orgId: v.id("orgs"),
+    conversationId: v.id("conversations"),
+    contactId: v.id("contacts"),
+    text: v.string(),
+    author: v.string(), // user id, "bot" or "ai"
+    createdAt: v.number(),
+  }).index("by_conversation", ["conversationId", "createdAt"]),
 
   // ---- AI ----
   knowledge: defineTable({

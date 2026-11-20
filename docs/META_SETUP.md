@@ -31,6 +31,7 @@ Known issue to check on day one: some developers report `messages` webhooks not 
 ## 5. Values to put in Convex env
 `META_APP_ID`, `META_APP_SECRET`, `META_WEBHOOK_VERIFY_TOKEN`, `META_GRAPH_VERSION`.
 OAuth redirect URI to register in the app: `https://<deployment>.convex.site/meta/oauth/callback`.
+Data deletion callback URL: `https://<deployment>.convex.site/meta/data-deletion`. Deauthorize callback URL: `https://<deployment>.convex.site/meta/deauthorize`. Privacy policy / terms URLs: `<SITE_URL>/privacy`, `<SITE_URL>/terms` (drafts, get them reviewed).
 
 ## 6. Messaging rules the product must enforce
 - **User-initiated only.** You can only message people who messaged you, commented, or mentioned you. No cold DMs.

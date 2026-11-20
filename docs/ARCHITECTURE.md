@@ -30,6 +30,8 @@ React app (Vite) ── Better Auth session ──────────┘
   workspaces · connect Instagram · automations (templates) · live inbox · usage
 ```
 
+> **Implementation note (2026-11-20):** the runner, AI node and send path use the plain Convex scheduler + DB instead of the Workflow/Agent/Workpool/Rate Limiter components (see D10). Where this document says Workflow/Workpool/Agent/Rate Limiter, read "scheduler + `flowRuns` + `generateText` + `usage` table". Extra modules: `outbound.ts`, `accounts.ts`, `privacy.ts`, `admin.ts`, `billing.ts`, `crons.ts`, `ai/{models,provider,prompt,pricing,quota}.ts`, `instagram/{oauth,profile,signedRequest,window}.ts`, `lib/{plans,time,safeUrl}.ts`.
+
 ## 2. Folder layout (target)
 
 ```
@@ -87,7 +89,7 @@ All tenant tables have `orgId` (the Better Auth organization id, string) and an 
 | `flowVersions` | orgId, flowId, version, graph (JSON validated by `engine/graph.ts`), createdBy, createdAt | Immutable once published. |
 | `triggers` | orgId, igAccountId, type, config, flowId, enabled, priority | See trigger types below. |
 | `flowRuns` | orgId, flowVersionId, contactId, conversationId, workflowId, status (`running`/`waiting`/`done`/`failed`/`cancelled`), currentNodeId, vars, startedAt, endedAt | One active run per conversation. |
-| `orgSettings` | orgId, plan, aiModel (`claude-haiku-5-5`/`claude-sonnet-5-5`), aiMonthlyQuota, byoAnthropicKeyEnc?, businessHours, timezone, defaultLanguage | |
+| `orgSettings` | orgId, plan, aiProvider (`anthropic`/`openrouter`), aiModel (`claude-haiku-5-5`/`claude-sonnet-5-5` or an OpenRouter `vendor/model` slug), aiMonthlyQuota, byoAnthropicKeyEnc?, byoOpenRouterKeyEnc?, businessHours, timezone, defaultLanguage | |
 | `usage` | orgId, month (`YYYY-MM`), aiReplies, inputTokens, outputTokens, costUsdMicros, outboundMessages | Updated by the agent usage handler. |
 | `knowledge` | orgId, title, content | Simple FAQ / product text for the AI node v1. Later this becomes the catalog integration. |
 
@@ -156,5 +158,7 @@ See `META_SETUP.md`. Key ones:
 | `META_GRAPH_VERSION` | e.g. `v24.0` (check the current version in Meta's docs) |
 | `TOKEN_ENCRYPTION_KEY` | 32-byte base64 key for AES-GCM |
 | `ANTHROPIC_API_KEY` | Platform Anthropic key (default AI provider) |
+| `BILLING_WEBHOOK_SECRET` | Optional. HMAC secret for `POST /billing/webhook` (`{orgId, plan}`) |
+| `OPENROUTER_API_KEY` | Platform OpenRouter key (optional; used when an org selects the `openrouter` provider without its own key) |
 
 Frontend (`.env.local`): `VITE_CONVEX_URL`, `VITE_CONVEX_SITE_URL`.

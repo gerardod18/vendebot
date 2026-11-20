@@ -35,6 +35,7 @@ Short ADR-style entries. Add new ones at the bottom. Don't rewrite old ones; sup
   | Opus 5.5 | $4 | $20 |
 
   A typical reply of about 3k input + 250 output tokens costs roughly $0.0005–0.001 on Haiku 5.5 and $0.01–0.02 on Sonnet 5.5.
+- **OpenRouter (added 2026-11-20):** orgs can pick `aiProvider: "openrouter"` and any OpenRouter slug (`openai/gpt-5-mini`, `google/gemini-2.5-flash`, ...) via `@openrouter/ai-sdk-provider`. Key precedence: org BYO key, then platform `OPENROUTER_API_KEY`. Cost/quota metering for non-Claude models must use per-model prices (OpenRouter reports usage cost); the table above only covers Anthropic.
 - **Guardrails:** per-org monthly AI quota (Rate Limiter + `usage` table), with a fallback branch when it's exceeded (as SendPulse does). Optional bring-your-own Anthropic key per org (stored encrypted). Prompt caching for system prompt and knowledge. Short history window.
 
 ## D6: Durable execution and fairness: Convex Workflow + Workpool + Rate Limiter
@@ -56,3 +57,10 @@ Short ADR-style entries. Add new ones at the bottom. Don't rewrite old ones; sup
 - **Decision:** Better Auth is used for **authentication only** (users, sessions). Workspaces live in app-owned Convex tables (`orgs`, `members`, `invites`) and are enforced by `convex/lib/tenancy.ts`.
 - **Why:** The `@convex-dev/better-auth` component's schema has no organization tables (it ships user, session, account, verification, twoFactor, oauth*, jwks, rateLimit). Using the plugin would mean extending the component schema and reading org data across the component boundary in every query. Own tables are simpler to query, index by `orgId`, and test with convex-test.
 - **Supersedes the "organization plugin" part of D3.** Better Auth itself is unchanged. If the plugin is wanted later, migrate `members` to it.
+
+## D10: Runner, AI and rate limiting built on plain Convex (scheduler + DB), not the Workflow/Agent/Workpool/Rate Limiter components
+- **Date:** 2026-11-20
+- **Decision:** Flow runs are rows in `flowRuns` advanced by the pure interpreter inside mutations (`engine/runner.ts`). Waits are `ctx.scheduler.runAfter` timeouts guarded by `flowRuns.waitSeq` (stale timers are ignored). Inbound events are processed by scheduling `processInbound` from the webhook (Meta still gets a fast 200). The AI node is `generateText` + tools from the AI SDK (`ai/agent.ts`) with a per-run lock; quota and usage live in the `usage` table (`ai/quota.ts`). Outbound sends retry retryable Graph errors with backoff (`outbound.ts`).
+- **Why:** The agent sandbox has no Convex deployment, and the components can't be loaded by convex-test, so code using them could not be verified. The scheduler + DB design is fully covered by tests (`tests/runner.test.ts`) and needs no extra infrastructure (still consistent with the "no new infra" rule). It is built-in Convex, not a new dependency.
+- **Supersedes** the Workflow/Workpool/Rate Limiter part of D6 and the "Convex Agent component" part of D5 (provider choice and cost table in D5 are unchanged). The components stay registered in `convex.config.ts` and can be adopted later if per-account throughput needs a real Workpool or Rate Limiter (e.g. many tenants on one webhook burst).
+- **Known limits:** no per-account send throttle beyond Meta's own 429s; concurrent `processInbound` calls for one conversation are serialised by Convex transactions (OCC retries) but AI delivery vs. the next node's messages can interleave (a 1.5 s delay is used on AI exit).
