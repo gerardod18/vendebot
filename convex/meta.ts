@@ -34,8 +34,17 @@ export const receiveWebhook = httpAction(async (ctx, request) => {
 
   const events = parseWebhook(body);
   if (events.length > 0) {
-    await ctx.runMutation(internal.engine.ingest.ingestEvents, { events });
-    // TODO(phase 4): enqueue processing of `accepted` events on the eventPool Workpool.
+    const { accepted } = await ctx.runMutation(internal.engine.ingest.ingestEvents, { events });
+    // Process each NEW event asynchronously so Meta gets its 200 fast (D10: scheduler, not Workpool).
+    for (const a of accepted) {
+      await ctx.scheduler.runAfter(0, internal.engine.runner.processInbound, {
+        event: a.event,
+        conversationId: a.conversationId as any,
+        contactId: a.contactId as any,
+        igAccountId: a.igAccountId as any,
+        isFirstContact: a.isFirstContact,
+      });
+    }
   }
   // Meta expects 200 quickly; anything non-2xx makes it retry.
   return new Response("ok", { status: 200 });
