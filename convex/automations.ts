@@ -17,6 +17,8 @@ export const create = orgAdminMutation({
     /** comment triggers: restrict to these media ids (empty/undefined = any post). */
     mediaIds: v.optional(v.array(v.string())),
     priority: v.optional(v.number()),
+    /** comment triggers: public reply posted under the comment. */
+    publicReply: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const account = await ctx.db.get(args.igAccountId);
@@ -50,6 +52,7 @@ export const create = orgAdminMutation({
         ...(keywords.length ? { keywords } : {}),
         ...(triggerType === "keyword" || triggerType === "comment" ? { match: args.match ?? "contains" } : {}),
         ...(args.mediaIds?.length ? { mediaIds: args.mediaIds } : {}),
+        ...(triggerType === "comment" && args.publicReply?.trim() ? { publicReply: args.publicReply.trim().slice(0, 300) } : {}),
       },
       flowId,
       enabled: true,
