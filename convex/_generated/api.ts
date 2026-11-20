@@ -4,6 +4,8 @@
  * Replaced by the real output of `npx convex dev` / `npx convex codegen`.
  */
 
+import type * as ai_models from "../ai/models.js";
+import type * as ai_provider from "../ai/provider.js";
 import type * as auth from "../auth.js";
 import type * as automations from "../automations.js";
 import type * as engine_graph from "../engine/graph.js";
@@ -29,6 +31,8 @@ import type { ComponentApi as eventPool_api } from "@convex-dev/workpool/_genera
 import type { ComponentApi as rateLimiter_api } from "@convex-dev/rate-limiter/_generated/component.js";
 
 declare const fullApi: ApiFromModules<{
+  "ai/models": typeof ai_models;
+  "ai/provider": typeof ai_provider;
   "auth": typeof auth;
   "automations": typeof automations;
   "engine/graph": typeof engine_graph;
