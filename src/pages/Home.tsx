@@ -15,7 +15,7 @@ export function Home() {
 
   const steps = [
     { done: true, label: "Crear tu espacio de trabajo", to: "/", help: "Listo." },
-    { done: (accounts ?? []).some((a) => a.status === "active"), label: "Conectar tu cuenta de Instagram", to: "/accounts", help: "Necesitas una cuenta profesional (Business o Creator)." },
+    { done: (accounts ?? []).some((a) => a.status === "active"), label: "Conectar tu cuenta de Instagram o WhatsApp", to: "/accounts", help: "Necesitas una cuenta profesional (Business o Creator)." },
     { done: (automations ?? []).length > 0, label: "Crear tu primera respuesta automática", to: "/automations", help: "Por ejemplo: un mensaje de bienvenida o una respuesta a la palabra «precio»." },
     { done: (knowledge ?? []).length > 0, label: "Enseñarle a la IA sobre tu negocio", to: "/knowledge", help: "Horarios, envíos, formas de pago, preguntas frecuentes." },
     { done: Boolean(settings?.aiInstructions), label: "Escribir cómo debe hablar tu asistente", to: "/settings", help: "Tono, qué vendes y qué NO debe prometer." },
