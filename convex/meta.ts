@@ -1,7 +1,7 @@
 import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { exchangeLongLivedToken } from "./instagram/client";
-import { exchangeCode, fetchOwnProfile } from "./instagram/oauth";
+import { exchangeLongLivedToken, igLoginMode } from "./instagram/client";
+import { exchangeCode, exchangeUnifiedCode, fetchAssignedInstagramAccounts, fetchOwnProfile } from "./instagram/oauth";
 import { parseWebhook } from "./instagram/parse";
 import { parseSignedRequest } from "./instagram/signedRequest";
 import { encryptSecret } from "./lib/crypto";
@@ -70,7 +70,22 @@ export const oauthCallback = httpAction(async (ctx, request) => {
   const encKey = process.env.TOKEN_ENCRYPTION_KEY;
   if (!appId || !appSecret || !site || !encKey) return back("/accounts?error=config");
   try {
-    const short = await exchangeCode({ code, appId, appSecret, redirectUri: `${site}/meta/oauth/callback` });
+    const redirectUri = `${site}/meta/oauth/callback`;
+    if (igLoginMode() === "unified") {
+      const tok = await exchangeUnifiedCode({ code, appId, appSecret, redirectUri, graphVersion: process.env.META_GRAPH_VERSION });
+      const accounts = await fetchAssignedInstagramAccounts(tok.accessToken, process.env.META_GRAPH_VERSION);
+      if (accounts.length === 0) return back("/accounts?error=noaccount");
+      const tokenEnc = await encryptSecret(tok.accessToken, encKey);
+      for (const acc of accounts) {
+        const accountId = await ctx.runMutation(internal.accounts.upsertAccount, {
+          orgId: who.orgId, userId: who.userId, igUserId: acc.igUserId, username: acc.username,
+          tokenEnc, tokenExpiresAt: tok.expiresAt,
+        });
+        await ctx.scheduler.runAfter(0, internal.accounts.subscribeWebhooks, { accountId, igUserId: acc.igUserId, token: tok.accessToken });
+      }
+      return back("/accounts?connected=1");
+    }
+    const short = await exchangeCode({ code, appId, appSecret, redirectUri });
     const long = await exchangeLongLivedToken(short.accessToken, appSecret);
     const profile = await fetchOwnProfile(long.accessToken, process.env.META_GRAPH_VERSION);
     const igUserId = profile.igUserId || short.igUserId;

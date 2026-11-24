@@ -60,3 +60,4 @@ vite 8, typescript 6, tailwindcss 4, vitest 5, convex-test 0.0.67.
 - 2026-11-03: Added Graph client, flow graph/interpreter/templates, automations CRUD. 63 tests. Pushed after each milestone (conventional commits).
 - 2026-11-03: Phase 0 scaffold + pure core (signature, parser, crypto, router) with tests. Decision D9 (own org tables).
 - 2026-11-03: Research + planning session. Chose stack and decisions D1–D8. Created repo docs and installed deps.
+- 2026-11-24: Local run verified (anonymous Convex backend, real codegen, 102 tests). New Meta apps only offer "Unified login", so added `META_LOGIN_MODE=unified` (config_id login, business token, graph.facebook.com) next to the classic flow. Send path, private replies, webhook payload shape and deauthorize callback are still UNVERIFIED for unified; needs `META_CONFIG_ID` and a live DM test.

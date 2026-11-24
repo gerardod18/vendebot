@@ -1,8 +1,8 @@
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { internalAction, internalMutation, internalQuery } from "./_generated/server";
-import { buildAuthUrl } from "./instagram/oauth";
-import { createIgClient, refreshLongLivedToken } from "./instagram/client";
+import { buildAuthUrl, buildUnifiedAuthUrl } from "./instagram/oauth";
+import { createIgClient, igLoginMode, refreshLongLivedToken } from "./instagram/client";
 import { decryptSecret, encryptSecret } from "./lib/crypto";
 import { orgAdminMutation, orgQuery } from "./lib/tenancy";
 
@@ -28,7 +28,13 @@ export const startConnect = orgAdminMutation({
     const bytes = crypto.getRandomValues(new Uint8Array(24));
     const state = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
     await ctx.db.insert("oauthStates", { orgId: ctx.orgId, userId: ctx.userId, state, expiresAt: Date.now() + 10 * 60_000 });
-    return { url: buildAuthUrl({ appId, redirectUri: `${site}/meta/oauth/callback`, state }) };
+    const redirectUri = `${site}/meta/oauth/callback`;
+    if (igLoginMode() === "unified") {
+      const configId = process.env.META_CONFIG_ID;
+      if (!configId) throw new Error("Unified login needs META_CONFIG_ID (the login configuration id from the Meta dashboard)");
+      return { url: buildUnifiedAuthUrl({ appId, configId, redirectUri, state }) };
+    }
+    return { url: buildAuthUrl({ appId, redirectUri, state }) };
   },
 });
 

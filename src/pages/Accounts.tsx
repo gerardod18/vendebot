@@ -6,7 +6,7 @@ import { useOrg } from "../lib/org";
 
 const MESSAGES: Record<string, string> = {
   denied: "Cancelaste la conexión.", state: "La conexión expiró. Inténtalo de nuevo.", config: "El servidor no está configurado para Instagram.",
-  taken: "Esa cuenta ya está conectada a otro espacio de trabajo.", failed: "No pudimos conectar la cuenta. Inténtalo de nuevo.",
+  noaccount: "Meta no devolvió ninguna cuenta profesional de Instagram.", taken: "Esa cuenta ya está conectada a otro espacio de trabajo.", failed: "No pudimos conectar la cuenta. Inténtalo de nuevo.",
 };
 
 export function Accounts() {
