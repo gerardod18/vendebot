@@ -1,8 +1,10 @@
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
-import { internalAction, internalMutation, internalQuery } from "./_generated/server";
-import { buildAuthUrl, buildUnifiedAuthUrl } from "./instagram/oauth";
-import { createIgClient, igLoginMode, refreshLongLivedToken } from "./instagram/client";
+import type { Id } from "./_generated/dataModel";
+import { internalAction, internalMutation, internalQuery, type MutationCtx } from "./_generated/server";
+import { buildUnifiedAuthUrl } from "./instagram/oauth";
+import { createIgClient } from "./instagram/client";
+import { createWhatsAppClient } from "./whatsapp/client";
 import { decryptSecret, encryptSecret } from "./lib/crypto";
 import { orgAdminMutation, orgQuery } from "./lib/tenancy";
 
@@ -12,7 +14,7 @@ export const list = orgQuery({
   handler: async (ctx) => {
     const rows = await ctx.db.query("igAccounts").withIndex("by_org", (q) => q.eq("orgId", ctx.orgId)).collect();
     return rows.map((a) => ({
-      accountId: a._id, igUserId: a.igUserId, username: a.username, name: a.name, profilePictureUrl: a.profilePictureUrl,
+      accountId: a._id, igUserId: a.igUserId, channel: a.channel ?? ("instagram" as const), username: a.username, name: a.name, profilePictureUrl: a.profilePictureUrl,
       status: a.status, tokenExpiresAt: a.tokenExpiresAt, webhookSubscribed: a.webhookSubscribed,
     }));
   },
@@ -29,12 +31,9 @@ export const startConnect = orgAdminMutation({
     const state = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
     await ctx.db.insert("oauthStates", { orgId: ctx.orgId, userId: ctx.userId, state, expiresAt: Date.now() + 10 * 60_000 });
     const redirectUri = `${site}/meta/oauth/callback`;
-    if (igLoginMode() === "unified") {
-      const configId = process.env.META_CONFIG_ID;
-      if (!configId) throw new Error("Unified login needs META_CONFIG_ID (the login configuration id from the Meta dashboard)");
-      return { url: buildUnifiedAuthUrl({ appId, configId, redirectUri, state }) };
-    }
-    return { url: buildAuthUrl({ appId, redirectUri, state }) };
+    const configId = process.env.META_CONFIG_ID;
+    if (!configId) throw new Error("Instagram connection needs META_CONFIG_ID (the login configuration id from the Meta dashboard)");
+    return { url: buildUnifiedAuthUrl({ appId, configId, redirectUri, state }) };
   },
 });
 
@@ -61,27 +60,107 @@ export const consumeState = internalMutation({
   },
 });
 
-/** Create or reactivate the account. An Instagram account may belong to only one workspace. */
+type UpsertArgs = {
+  orgId: Id<"orgs">; userId: string; igUserId: string; username: string; name?: string; profilePictureUrl?: string;
+  tokenEnc: string; tokenExpiresAt: number; channel?: "instagram" | "whatsapp"; wabaId?: string;
+};
+
+/** Create or reactivate the account. A channel account may belong to only one workspace. */
+async function upsertAccountRow(ctx: MutationCtx, a: UpsertArgs) {
+  const existing = await ctx.db.query("igAccounts").withIndex("by_igUserId", (q) => q.eq("igUserId", a.igUserId)).unique();
+  if (existing && existing.orgId !== a.orgId && existing.status !== "revoked") {
+    throw new Error("This account is already connected to another workspace");
+  }
+  const fields = {
+    username: a.username, name: a.name, profilePictureUrl: a.profilePictureUrl, tokenEnc: a.tokenEnc,
+    tokenExpiresAt: a.tokenExpiresAt, status: "active" as const, connectedBy: a.userId,
+    channel: a.channel, wabaId: a.wabaId,
+  };
+  if (existing) {
+    await ctx.db.patch(existing._id, { ...fields, orgId: a.orgId });
+    return existing._id;
+  }
+  return ctx.db.insert("igAccounts", { orgId: a.orgId, igUserId: a.igUserId, webhookSubscribed: false, ...fields });
+}
+
 export const upsertAccount = internalMutation({
   args: {
     orgId: v.id("orgs"), userId: v.string(), igUserId: v.string(), username: v.string(),
     name: v.optional(v.string()), profilePictureUrl: v.optional(v.string()),
     tokenEnc: v.string(), tokenExpiresAt: v.number(),
   },
+  handler: (ctx, a) => upsertAccountRow(ctx, a),
+});
+
+const TEN_YEARS_MS = 10 * 365 * 24 * 3600_000;
+
+/**
+ * Connect a WhatsApp number by pasting its phone_number_id, WABA id and an access token
+ * (a permanent system-user token, or the temporary one from the API Setup page for a demo).
+ * The token is encrypted at rest; verification and webhook subscription run right after.
+ */
+export const connectWhatsApp = orgAdminMutation({
+  args: { phoneNumberId: v.string(), wabaId: v.string(), accessToken: v.string() },
   handler: async (ctx, a) => {
-    const existing = await ctx.db.query("igAccounts").withIndex("by_igUserId", (q) => q.eq("igUserId", a.igUserId)).unique();
-    if (existing && existing.orgId !== a.orgId && existing.status !== "revoked") {
-      throw new Error("This Instagram account is already connected to another workspace");
+    const encKey = process.env.TOKEN_ENCRYPTION_KEY;
+    if (!encKey) throw new Error("Server is not configured (TOKEN_ENCRYPTION_KEY)");
+    const phoneNumberId = a.phoneNumberId.trim(), wabaId = a.wabaId.trim(), token = a.accessToken.trim();
+    if (!/^\d{5,25}$/.test(phoneNumberId) || !/^\d{5,25}$/.test(wabaId)) throw new Error("Phone number id and WABA id must be numeric ids");
+    if (token.length < 20) throw new Error("Access token looks too short");
+    const accountId = await upsertAccountRow(ctx, {
+      orgId: ctx.orgId, userId: ctx.userId, igUserId: phoneNumberId, username: phoneNumberId,
+      tokenEnc: await encryptSecret(token, encKey), tokenExpiresAt: Date.now() + TEN_YEARS_MS, channel: "whatsapp", wabaId,
+    });
+    await ctx.scheduler.runAfter(0, internal.accounts.verifyWhatsApp, { accountId });
+    return { accountId };
+  },
+});
+
+export const loadForVerify = internalQuery({
+  args: { accountId: v.id("igAccounts") },
+  handler: async (ctx, { accountId }) => {
+    const a = await ctx.db.get(accountId);
+    return a && a.channel === "whatsapp" ? { phoneNumberId: a.igUserId, wabaId: a.wabaId, tokenEnc: a.tokenEnc } : null;
+  },
+});
+
+export const setDisplay = internalMutation({
+  args: { accountId: v.id("igAccounts"), username: v.string(), name: v.optional(v.string()) },
+  handler: async (ctx, { accountId, ...p }) => {
+    await ctx.db.patch(accountId, p);
+  },
+});
+
+export const markExpired = internalMutation({
+  args: { accountId: v.id("igAccounts") },
+  handler: async (ctx, { accountId }) => {
+    await ctx.db.patch(accountId, { status: "expired", webhookSubscribed: false });
+  },
+});
+
+/** Checks the pasted credentials, stores the display number and subscribes the app to the WABA. */
+export const verifyWhatsApp = internalAction({
+  args: { accountId: v.id("igAccounts") },
+  handler: async (ctx, { accountId }) => {
+    const encKey = process.env.TOKEN_ENCRYPTION_KEY;
+    const t = await ctx.runQuery(internal.accounts.loadForVerify, { accountId });
+    if (!t || !encKey) return;
+    const client = createWhatsAppClient({
+      accessToken: await decryptSecret(t.tokenEnc, encKey), phoneNumberId: t.phoneNumberId, graphVersion: process.env.META_GRAPH_VERSION,
+    });
+    try {
+      const info = await client.getPhoneNumber();
+      await ctx.runMutation(internal.accounts.setDisplay, { accountId, username: info.displayPhoneNumber, name: info.verifiedName });
+    } catch {
+      await ctx.runMutation(internal.accounts.markExpired, { accountId }); // bad token / wrong phone number id
+      return;
     }
-    const fields = {
-      username: a.username, name: a.name, profilePictureUrl: a.profilePictureUrl, tokenEnc: a.tokenEnc,
-      tokenExpiresAt: a.tokenExpiresAt, status: "active" as const, connectedBy: a.userId,
-    };
-    if (existing) {
-      await ctx.db.patch(existing._id, { ...fields, orgId: a.orgId });
-      return existing._id;
+    try {
+      if (t.wabaId) await client.subscribeWaba(t.wabaId);
+      await ctx.runMutation(internal.accounts.markSubscribed, { accountId, subscribed: Boolean(t.wabaId) });
+    } catch {
+      await ctx.runMutation(internal.accounts.markSubscribed, { accountId, subscribed: false });
     }
-    return ctx.db.insert("igAccounts", { orgId: a.orgId, igUserId: a.igUserId, webhookSubscribed: false, ...fields });
   },
 });
 
@@ -89,47 +168,6 @@ export const markSubscribed = internalMutation({
   args: { accountId: v.id("igAccounts"), subscribed: v.boolean() },
   handler: async (ctx, { accountId, subscribed }) => {
     await ctx.db.patch(accountId, { webhookSubscribed: subscribed });
-  },
-});
-
-// ---- Token refresh cron ----
-const REFRESH_WINDOW_MS = 10 * 24 * 3600_000;
-
-export const dueForRefresh = internalQuery({
-  args: {},
-  handler: async (ctx) => {
-    const rows = await ctx.db
-      .query("igAccounts").withIndex("by_tokenExpiresAt", (q) => q.lt("tokenExpiresAt", Date.now() + REFRESH_WINDOW_MS)).collect();
-    return rows.filter((r) => r.status === "active").map((r) => ({ accountId: r._id, tokenEnc: r.tokenEnc }));
-  },
-});
-
-export const saveRefreshed = internalMutation({
-  args: { accountId: v.id("igAccounts"), tokenEnc: v.string(), tokenExpiresAt: v.number() },
-  handler: async (ctx, { accountId, ...patch }) => {
-    await ctx.db.patch(accountId, patch);
-  },
-});
-
-export const refreshTokens = internalAction({
-  args: {},
-  handler: async (ctx) => {
-    const encKey = process.env.TOKEN_ENCRYPTION_KEY;
-    if (!encKey) return { refreshed: 0, expired: 0 };
-    let refreshed = 0, expired = 0;
-    for (const a of await ctx.runQuery(internal.accounts.dueForRefresh, {})) {
-      try {
-        const next = await refreshLongLivedToken(await decryptSecret(a.tokenEnc, encKey));
-        await ctx.runMutation(internal.accounts.saveRefreshed, {
-          accountId: a.accountId, tokenEnc: await encryptSecret(next.accessToken, encKey), tokenExpiresAt: next.expiresAt,
-        });
-        refreshed++;
-      } catch {
-        await ctx.runMutation(internal.outbound.markAccountExpired, { accountId: a.accountId });
-        expired++;
-      }
-    }
-    return { refreshed, expired };
   },
 });
 

@@ -1,11 +1,9 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { createIgClient } from "../convex/instagram/client";
+import { describe, expect, it, vi } from "vitest";
 import {
   buildUnifiedAuthUrl, exchangeUnifiedCode, fetchAssignedInstagramAccounts, UNIFIED_TOKEN_TTL_MS,
 } from "../convex/instagram/oauth";
 
 const ok = (json: unknown, status = 200) => new Response(JSON.stringify(json), { status });
-afterEach(() => vi.unstubAllEnvs());
 
 describe("unified login", () => {
   it("builds the Facebook Login for Business URL with config_id and no scope", () => {
@@ -28,15 +26,5 @@ describe("unified login", () => {
     const f = vi.fn(async (..._a: unknown[]) => ok({ data: [{ id: "17841", username: "almeidagdev" }] }));
     expect(await fetchAssignedInstagramAccounts("T", "v24.0", f)).toEqual([{ igUserId: "17841", username: "almeidagdev" }]);
     expect(String(f.mock.calls[0][0])).toContain("/me/assigned_instagram_accounts");
-  });
-
-  it("client targets graph.facebook.com in unified mode and graph.instagram.com otherwise", async () => {
-    const f = vi.fn(async (..._a: unknown[]) => ok({ message_id: "m" }));
-    vi.stubEnv("META_LOGIN_MODE", "unified");
-    await createIgClient({ accessToken: "t", igUserId: "17841", fetch: f }).sendMessage({ recipientId: "u" }, { text: "hi" });
-    expect(String(f.mock.calls[0][0])).toMatch(/^https:\/\/graph\.facebook\.com\/v24\.0\/17841\/messages/);
-    vi.stubEnv("META_LOGIN_MODE", "");
-    await createIgClient({ accessToken: "t", igUserId: "17841", fetch: f }).sendMessage({ recipientId: "u" }, { text: "hi" });
-    expect(String(f.mock.calls[1][0])).toMatch(/^https:\/\/graph\.instagram\.com\//);
   });
 });

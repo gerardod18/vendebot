@@ -21,7 +21,7 @@ Work top to bottom inside a phase. Each item should be roughly one PR or commit.
 ## Phase 2: Instagram connection (own accounts, Standard Access)
 - [ ] Meta app created and configured (owner; follow `META_SETUP.md`)
 - [x] `convex/lib/crypto.ts` AES-GCM token encryption + tests
-- [x] OAuth connect flow: "Connect Instagram" button → Instagram Login → `/meta/oauth/callback` → exchange code → long-lived token → save `igAccounts` → subscribe the account to webhook fields (`messages`, `messaging_postbacks`, `comments`, `mentions`)
+- [x] OAuth connect flow: "Connect Instagram" button → Unified login (`config_id`) → `/meta/oauth/callback` → exchange code → business token → save `igAccounts` → subscribe the account to webhook fields (`messages`, `messaging_postbacks`, `comments`, `mentions`)
 - [x] Accounts page: list, status, disconnect, reconnect
 - [x] Cron: refresh tokens expiring within 10 days; mark `expired` on failure
 
@@ -60,6 +60,7 @@ Work top to bottom inside a phase. Each item should be roughly one PR or commit.
 
 ## Phase 6: Hardening for real customers
 - [x] Privacy policy + terms pages (**DRAFTS, have a lawyer review and fill the [brackets]**), data deletion callback (`/meta/data-deletion`) + status page, deauthorize callback (`/meta/deauthorize`)
+- [x] WhatsApp Cloud API channel base (parser, client, connect-by-token, outbound branch); templates outside 24h window still to do
 - [ ] Meta Business Verification (owner) + App Review screencasts for `instagram_business_basic`, `instagram_business_manage_messages`, `instagram_business_manage_comments`
 - [x] Webhook event retention cron + admin "Errores" view of failed runs. **Still TODO: external error monitoring (Sentry etc., needs an account).**
 - [ ] Billing (Stripe or Polar), plans → `aiMonthlyQuota`. **Done:** plans table (`lib/plans.ts`), `billing.applyPlan`, signed `/billing/webhook`. **Missing:** the actual Stripe/Polar adapter + checkout UI (needs the owner's account).

@@ -14,6 +14,7 @@ export type InboundEvent =
       text?: string;
       quickReplyPayload?: string;
       replyToStoryId?: string;
+      senderName?: string; // WhatsApp supplies the contact's profile name in the webhook
     }
   | {
       type: "story_mention";

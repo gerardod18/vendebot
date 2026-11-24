@@ -88,8 +88,10 @@ export default defineSchema({
   // ---- Instagram ----
   igAccounts: defineTable({
     orgId: v.id("orgs"),
-    igUserId: v.string(), // IG professional account id (webhook entry.id)
-    username: v.string(),
+    igUserId: v.string(), // IG professional account id (webhook entry.id); for WhatsApp, the phone_number_id
+    channel: v.optional(v.union(v.literal("instagram"), v.literal("whatsapp"))), // default instagram
+    wabaId: v.optional(v.string()), // WhatsApp Business Account id
+    username: v.string(), // IG username; for WhatsApp, the display phone number
     name: v.optional(v.string()),
     profilePictureUrl: v.optional(v.string()),
     tokenEnc: v.string(),
