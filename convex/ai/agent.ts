@@ -13,6 +13,7 @@ import { graphSchema } from "../engine/graph";
 import { advance } from "../engine/runner";
 import { estimateCostMicros } from "./pricing";
 import { buildSystemPrompt, toModelMessages } from "./prompt";
+import { DEFAULT_MODEL, DEFAULT_PROVIDER } from "./models";
 import { getLanguageModel } from "./provider";
 import { recordTokens, reserveAiReply } from "./quota";
 
@@ -40,6 +41,8 @@ export const beginTurn = internalMutation({
     const graph = graphSchema.safeParse(ver?.graph);
     const node = graph.success ? graph.data.nodes.find((n) => n.id === run.currentNodeId) : undefined;
     const settings = await ctx.db.query("orgSettings").withIndex("by_org", (q) => q.eq("orgId", run.orgId)).unique();
+    // Provider, model and keys are decided by the platform (superAdmin), not by each workspace.
+    const platform = await ctx.db.query("platformSettings").withIndex("by_key", (q) => q.eq("key", "ai")).unique();
     if (!node || node.type !== "aiAgent" || !settings) return { status: "skip" as const };
 
     const contact = await ctx.db.get(run.contactId);
@@ -56,8 +59,8 @@ export const beginTurn = internalMutation({
       status: "ok" as const,
       lastInboundAt,
       settings: {
-        aiProvider: settings.aiProvider, aiModel: node.model ?? settings.aiModel,
-        byoAnthropicKeyEnc: settings.byoAnthropicKeyEnc, byoOpenRouterKeyEnc: settings.byoOpenRouterKeyEnc,
+        aiProvider: platform?.aiProvider ?? DEFAULT_PROVIDER, aiModel: node.model ?? platform?.aiModel ?? DEFAULT_MODEL,
+        byoAnthropicKeyEnc: platform?.anthropicKeyEnc, byoOpenRouterKeyEnc: platform?.openRouterKeyEnc,
       },
       system: buildSystemPrompt({
         orgInstructions: settings.aiInstructions,
