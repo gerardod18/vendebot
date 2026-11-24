@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { validateGraph } from "./engine/graph";
+import { libraryById } from "./engine/library";
 import { buildGraph, TEMPLATE_TRIGGER, templateConfigSchema } from "./engine/templates";
 import type { MutationCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
@@ -214,5 +215,30 @@ export const saveGraph = orgAdminMutation({
     const versionId = await publishVersion(ctx, flow, ctx.userId, checked.graph, layout);
     await ctx.db.patch(flow._id, { activeVersionId: versionId, templateConfig: undefined });
     return { version: (await ctx.db.get(versionId))!.version };
+  },
+});
+
+/** Create an automation from a ready-made sales flow (see engine/library.ts). The graph is validated like any other. */
+export const createFromLibrary = orgAdminMutation({
+  args: { libraryId: v.string(), igAccountId: v.id("igAccounts"), name: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    const account = await ctx.db.get(args.igAccountId);
+    if (!account || account.orgId !== ctx.orgId) throw new Error("Instagram account not found");
+    const lib = libraryById(args.libraryId);
+    if (!lib) throw new Error("Unknown flow");
+    const channel = account.channel ?? "instagram";
+    if (!lib.channels.includes(channel)) throw new Error("This flow is not available for that channel");
+    const checked = validateGraph(lib.graph);
+    if (!checked.ok) throw new Error(`Invalid flow: ${checked.errors.slice(0, 3).join("; ")}`);
+    const name = checkName(args.name?.trim() || lib.title);
+    const config = buildTriggerConfig(lib.trigger.type, lib.trigger);
+
+    const flowId = await ctx.db.insert("flows", { orgId: ctx.orgId, name, archived: false });
+    const versionId = await ctx.db.insert("flowVersions", { orgId: ctx.orgId, flowId, version: 1, graph: checked.graph, createdBy: ctx.userId });
+    await ctx.db.patch(flowId, { activeVersionId: versionId });
+    const triggerId = await ctx.db.insert("triggers", {
+      orgId: ctx.orgId, igAccountId: args.igAccountId, type: lib.trigger.type, config, flowId, enabled: true, priority: 0, firedCount: 0,
+    });
+    return { flowId, triggerId };
   },
 });

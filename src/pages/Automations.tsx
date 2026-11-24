@@ -4,6 +4,7 @@ import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { AutomationForm, GROUP_ORDER, TEMPLATES, TYPE_TO_KEY } from "../components/AutomationForm";
 import { FlowEditor } from "../components/flow/FlowEditor";
+import { LibraryGallery } from "../components/LibraryGallery";
 import { Btn, ChannelBadge, ErrorText, Notice, PageTitle, Toggle, useRun, type Channel } from "../components/ui";
 import { useOrg } from "../lib/org";
 
@@ -13,6 +14,7 @@ export function Automations() {
   const accountRows = useQuery(api.accounts.list, { orgId: org.orgId });
   const setEnabled = useMutation(api.automations.setEnabled);
   const [selected, setSelected] = useState<Id<"triggers"> | "new" | null>(null);
+  const [newTab, setNewTab] = useState<"library" | "scratch">("library");
   const { run, error } = useRun();
 
   const accounts = useMemo(
@@ -62,8 +64,16 @@ export function Automations() {
         <section aria-live="polite" className="min-w-0">
           {selected === "new" && (
             <div className="rounded-lg border border-line bg-surface p-5">
-              <h2 className="mb-4 text-lg font-semibold">Nueva automatización</h2>
-              <AutomationForm accounts={accounts} onDone={(id) => setSelected(id ?? null)} />
+              <h2 className="mb-3 text-lg font-semibold">Nueva automatización</h2>
+              <div role="tablist" aria-label="Cómo empezar" className="mb-4 flex gap-1 border-b border-line">
+                {([["library", "Flujos de venta listos"], ["scratch", "Desde cero"]] as const).map(([k, label]) => (
+                  <button key={k} role="tab" aria-selected={newTab === k} type="button" onClick={() => setNewTab(k)}
+                    className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium ${newTab === k ? "border-brand text-brand" : "border-transparent text-ink-soft"}`}>{label}</button>
+                ))}
+              </div>
+              {newTab === "library"
+                ? <LibraryGallery accounts={accounts} onDone={(id) => setSelected(id)} />
+                : <AutomationForm accounts={accounts} onDone={(id) => setSelected(id ?? null)} />}
             </div>
           )}
           {selected && selected !== "new" && <Detail key={selected} triggerId={selected} accounts={accounts} onGone={() => setSelected(null)} />}
