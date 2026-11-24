@@ -28,16 +28,16 @@ export function Home() {
       <Card>
         <div className="flex items-center justify-between">
           <h2 className="font-medium">Configuración inicial</h2>
-          <span className="text-sm text-zinc-500">{done}/{steps.length}</span>
+          <span className="text-sm text-ink-soft">{done}/{steps.length}</span>
         </div>
-        <div className="mt-2 h-2 rounded bg-zinc-100"><div className="h-2 rounded bg-emerald-500" style={{ width: `${(done / steps.length) * 100}%` }} /></div>
+        <div className="mt-2 h-2 rounded bg-line"><div className="h-2 rounded bg-ok" style={{ width: `${(done / steps.length) * 100}%` }} /></div>
         <ul className="mt-3 divide-y">
           {steps.map((s) => (
             <li key={s.label} className="flex items-start gap-3 py-2">
-              <span className={`mt-0.5 ${s.done ? "text-emerald-600" : "text-zinc-300"}`}>{s.done ? "✔" : "○"}</span>
+              <span className={`mt-0.5 ${s.done ? "text-ok" : "text-line-strong"}`}>{s.done ? "✔" : "○"}</span>
               <div className="flex-1">
                 <Link to={s.to} className="text-sm font-medium underline">{s.label}</Link>
-                <p className="text-xs text-zinc-500">{s.help}</p>
+                <p className="text-xs text-ink-soft">{s.help}</p>
               </div>
             </li>
           ))}

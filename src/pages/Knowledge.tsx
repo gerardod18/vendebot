@@ -22,7 +22,7 @@ export function Knowledge() {
   return (
     <>
       <PageTitle title="Conocimiento del negocio">{isAdmin && !editing && <Btn onClick={() => setEditing({ title: "", content: "" })}>Agregar</Btn>}</PageTitle>
-      <p className="mb-3 text-sm text-zinc-600">Lo que escribas aquí es lo único que la IA usará para responder (horarios, envíos, precios, preguntas frecuentes). Si no está aquí, la IA pasará la conversación a una persona.</p>
+      <p className="mb-3 text-sm text-ink-soft">Lo que escribas aquí es lo único que la IA usará para responder (horarios, envíos, precios, preguntas frecuentes). Si no está aquí, la IA pasará la conversación a una persona.</p>
       {editing && (
         <Card className="mb-4">
           <form onSubmit={submit} className="space-y-3">
@@ -37,13 +37,13 @@ export function Knowledge() {
         {(list ?? []).map((k) => (
           <Card key={k.id}>
             <div className="flex items-start gap-2">
-              <div className="flex-1"><p className="font-medium">{k.title}</p><p className="whitespace-pre-wrap text-sm text-zinc-600">{k.content}</p></div>
+              <div className="flex-1"><p className="font-medium">{k.title}</p><p className="whitespace-pre-wrap text-sm text-ink-soft">{k.content}</p></div>
               {isAdmin && <><Btn variant="ghost" onClick={() => setEditing({ id: k.id, title: k.title, content: k.content })}>Editar</Btn>
                 <Btn variant="ghost" onClick={() => confirm("¿Eliminar?") && run(() => remove({ orgId: org.orgId, id: k.id }))}>Eliminar</Btn></>}
             </div>
           </Card>
         ))}
-        {list?.length === 0 && !editing && <p className="text-sm text-zinc-500">Aún no hay información.</p>}
+        {list?.length === 0 && !editing && <p className="text-sm text-ink-soft">Aún no hay información.</p>}
       </div>
     </>
   );

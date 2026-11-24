@@ -39,7 +39,7 @@ export function Accounts() {
       </PageTitle>
       {isAdmin && showWa && (
         <Card className="mb-3 space-y-3">
-          <p className="text-sm text-zinc-600">Pega los datos de WhatsApp Cloud API (Meta → tu app → WhatsApp → API Setup). Para la demo sirve el token temporal; en producción usa un token permanente de usuario del sistema.</p>
+          <p className="text-sm text-ink-soft">Pega los datos de WhatsApp Cloud API (Meta → tu app → WhatsApp → API Setup). Para la demo sirve el token temporal; en producción usa un token permanente de usuario del sistema.</p>
           <Field label="Phone number ID"><input className={inputCls} value={wa.phoneNumberId} onChange={(e) => setWa({ ...wa, phoneNumberId: e.target.value })} /></Field>
           <Field label="WhatsApp Business Account ID"><input className={inputCls} value={wa.wabaId} onChange={(e) => setWa({ ...wa, wabaId: e.target.value })} /></Field>
           <Field label="Access token"><input className={inputCls} type="password" autoComplete="off" value={wa.accessToken} onChange={(e) => setWa({ ...wa, accessToken: e.target.value })} /></Field>
@@ -49,15 +49,15 @@ export function Accounts() {
           </Btn>
         </Card>
       )}
-      {params.get("connected") && <p className="mb-3 rounded bg-emerald-50 p-2 text-sm text-emerald-800">¡Cuenta conectada!</p>}
-      {err && <p className="mb-3 rounded bg-red-50 p-2 text-sm text-red-700">{MESSAGES[err] ?? "Error al conectar."}</p>}
+      {params.get("connected") && <p className="mb-3 rounded bg-ok-wash p-2 text-sm text-ok">¡Cuenta conectada!</p>}
+      {err && <p className="mb-3 rounded bg-danger-wash p-2 text-sm text-danger">{MESSAGES[err] ?? "Error al conectar."}</p>}
       <ErrorText error={error} />
       <div className="space-y-2">
         {(accounts ?? []).map((a) => (
           <Card key={a.accountId} className="flex items-center gap-3">
             <div className="flex-1">
               <p className="font-medium">{a.channel === "whatsapp" ? `WhatsApp ${a.username}` : `@${a.username}`}</p>
-              <p className="text-xs text-zinc-500">
+              <p className="text-xs text-ink-soft">
                 {a.status === "active" ? "Activa" : a.status === "expired" ? "Expirada: reconecta" : "Desconectada"}
                 {a.status === "active" && a.channel !== "whatsapp" && ` · token hasta ${fmtTime(a.tokenExpiresAt)}`}
                 {a.status === "active" && !a.webhookSubscribed && " · ⚠ sin suscripción a mensajes"}
@@ -69,7 +69,7 @@ export function Accounts() {
             )}
           </Card>
         ))}
-        {accounts?.length === 0 && <p className="text-sm text-zinc-500">Aún no has conectado ninguna cuenta.</p>}
+        {accounts?.length === 0 && <p className="text-sm text-ink-soft">Aún no has conectado ninguna cuenta.</p>}
       </div>
     </>
   );

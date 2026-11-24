@@ -186,6 +186,7 @@ export default defineSchema({
     flowId: v.id("flows"),
     version: v.number(),
     graph: v.any(), // validated by convex/engine/graph.ts
+    layout: v.optional(v.any()), // editor block positions: { [nodeId]: { x, y } }
     createdBy: v.string(),
   }).index("by_flow", ["flowId", "version"]),
 

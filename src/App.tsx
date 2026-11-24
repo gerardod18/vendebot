@@ -32,7 +32,7 @@ export function App() {
         path="*"
         element={
           <>
-            <AuthLoading><div className="p-8 text-sm text-zinc-500">Cargando…</div></AuthLoading>
+            <AuthLoading><div className="p-8 text-sm text-ink-soft">Cargando…</div></AuthLoading>
             <Unauthenticated><SignIn /></Unauthenticated>
             <Authenticated>
               <Routes>

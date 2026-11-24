@@ -5,7 +5,7 @@ import { api } from "../../convex/_generated/api";
 import { Card, ErrorText, useRun } from "../components/ui";
 
 const Page = ({ title, children }: { title: string; children: React.ReactNode }) => (
-  <div className="mx-auto max-w-2xl p-6"><Link to="/" className="text-sm underline">← vendebot</Link><h1 className="my-4 text-2xl font-semibold">{title}</h1><div className="space-y-3 text-sm leading-6 text-zinc-700">{children}</div></div>
+  <div className="mx-auto max-w-2xl p-6"><Link to="/" className="text-sm underline">← vendebot</Link><h1 className="my-4 text-2xl font-semibold">{title}</h1><div className="space-y-3 text-sm leading-6 text-ink">{children}</div></div>
 );
 
 /** DRAFT legal text: have it reviewed by a lawyer and fill the bracketed fields before going live. */
