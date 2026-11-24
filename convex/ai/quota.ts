@@ -6,15 +6,10 @@ async function usageDoc(ctx: QueryCtx, orgId: Id<"orgs">, month: string) {
   return ctx.db.query("usage").withIndex("by_org_month", (q) => q.eq("orgId", orgId).eq("month", month)).unique();
 }
 
-function hasByoKey(s: { aiProvider?: string; byoAnthropicKeyEnc?: string; byoOpenRouterKeyEnc?: string }) {
-  return Boolean(s.aiProvider === "openrouter" ? s.byoOpenRouterKeyEnc : s.byoAnthropicKeyEnc);
-}
-
-/** True when the org can still make an AI reply this month. Orgs with their own API key are unlimited. */
+/** True when the org can still make an AI reply this month. */
 export async function aiQuotaAvailable(ctx: QueryCtx, orgId: Id<"orgs">, now = Date.now()): Promise<boolean> {
   const s = await ctx.db.query("orgSettings").withIndex("by_org", (q) => q.eq("orgId", orgId)).unique();
   if (!s) return false;
-  if (hasByoKey(s)) return true;
   const u = await usageDoc(ctx, orgId, currentMonth(now));
   return (u?.aiReplies ?? 0) < s.aiMonthlyQuota;
 }

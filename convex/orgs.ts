@@ -1,8 +1,6 @@
 import { v } from "convex/values";
 import type { Doc } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
-import { DEFAULT_PROVIDER, validateModelId } from "./ai/models";
-import { encryptSecret } from "./lib/crypto";
 import { orgAdminMutation, orgAdminQuery, orgQuery, requireUserId } from "./lib/tenancy";
 import { roleValidator } from "./schema";
 
@@ -79,48 +77,10 @@ export const getSettings = orgQuery({
   handler: async (ctx) => {
     const s = await ctx.db.query("orgSettings").withIndex("by_org", (q) => q.eq("orgId", ctx.orgId)).unique();
     if (!s) return null;
-    // Never expose the encrypted BYO key to clients, only whether one is set.
-    const { byoAnthropicKeyEnc, byoOpenRouterKeyEnc, ...rest } = s;
-    const provider = rest.aiProvider ?? DEFAULT_PROVIDER;
-    return {
-      ...rest,
-      aiProvider: provider,
-      hasByoKey: Boolean(provider === "openrouter" ? byoOpenRouterKeyEnc : byoAnthropicKeyEnc),
-    };
-  },
-});
-
-/**
- * Choose the AI provider and model for this workspace, optionally storing the org's own API key
- * (encrypted). `apiKey`: omit to keep the current key, "" to remove it, a value to replace it.
- */
-export const setAiConfig = orgAdminMutation({
-  args: {
-    provider: v.union(v.literal("anthropic"), v.literal("openrouter")),
-    model: v.string(),
-    apiKey: v.optional(v.string()),
-  },
-  handler: async (ctx, { provider, model, apiKey }) => {
-    const modelId = model.trim();
-    const err = validateModelId(provider, modelId);
-    if (err) throw new Error(err);
-
-    const s = await ctx.db.query("orgSettings").withIndex("by_org", (q) => q.eq("orgId", ctx.orgId)).unique();
-    if (!s) throw new Error("Settings not found");
-
-    const patch: Partial<Doc<"orgSettings">> = { aiProvider: provider, aiModel: modelId };
-    if (apiKey !== undefined) {
-      const field = provider === "openrouter" ? "byoOpenRouterKeyEnc" : "byoAnthropicKeyEnc";
-      const trimmed = apiKey.trim();
-      if (trimmed === "") {
-        patch[field] = undefined;
-      } else {
-        const encKey = process.env.TOKEN_ENCRYPTION_KEY;
-        if (!encKey) throw new Error("TOKEN_ENCRYPTION_KEY is not set");
-        patch[field] = await encryptSecret(trimmed, encKey);
-      }
-    }
-    await ctx.db.patch(s._id, patch);
+    // The AI provider, model and keys belong to the platform (superAdmin); workspaces never see them.
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { byoAnthropicKeyEnc, byoOpenRouterKeyEnc, aiProvider, aiModel, ...rest } = s;
+    return rest;
   },
 });
 

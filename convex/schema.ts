@@ -85,6 +85,35 @@ export default defineSchema({
     aiInstructions: v.optional(v.string()),
   }).index("by_org", ["orgId"]),
 
+  // ---- Platform (cross-tenant) ----
+  /** Platform operators. A row with `userId` is an active superAdmin; without it, a pending grant claimed by that email. */
+  superAdmins: defineTable({
+    email: v.string(), // lowercase
+    userId: v.optional(v.string()),
+    addedBy: v.string(),
+    claimedAt: v.optional(v.number()),
+  }).index("by_email", ["email"]).index("by_userId", ["userId"]),
+
+  /** One row (key "ai"): the AI provider, model and keys for the whole service. Only superAdmins change it. */
+  platformSettings: defineTable({
+    key: v.literal("ai"),
+    aiProvider: v.union(v.literal("anthropic"), v.literal("openrouter")),
+    aiModel: v.string(),
+    anthropicKeyEnc: v.optional(v.string()),
+    openRouterKeyEnc: v.optional(v.string()),
+    updatedBy: v.string(),
+    updatedAt: v.number(),
+  }).index("by_key", ["key"]),
+
+  /** Who did what across tenants (config changes, grants, workspace views). */
+  adminAudit: defineTable({
+    userId: v.string(),
+    action: v.string(),
+    orgId: v.optional(v.id("orgs")),
+    detail: v.optional(v.string()),
+    at: v.number(),
+  }).index("by_at", ["at"]),
+
   // ---- Instagram ----
   igAccounts: defineTable({
     orgId: v.id("orgs"),

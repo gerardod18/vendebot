@@ -160,6 +160,18 @@ describe("AI agent turn", () => {
     });
   });
 
+  it("uses the platform provider, model and keys, not workspace settings", async () => {
+    const { t } = await seed({ template: aiTemplate, keywords: [] });
+    await t.run((ctx) => ctx.db.insert("platformSettings", {
+      key: "ai", aiProvider: "openrouter", aiModel: "openai/gpt-5-mini", openRouterKeyEnc: "enc-or", updatedBy: "root", updatedAt: Date.now(),
+    }));
+    let seen: any;
+    deps.getModel = async (settings: any) => { seen = settings; return modelThatSays("ok") as any; };
+    await receive(t, dm("m1", "hola"));
+    expect(seen).toMatchObject({ aiProvider: "openrouter", aiModel: "openai/gpt-5-mini", byoOpenRouterKeyEnc: "enc-or" });
+    expect(sent.map((x) => x.message.text)).toEqual(["ok"]);
+  });
+
   it("falls to the fallback message when the AI quota is exhausted", async () => {
     const { t } = await seed({ template: aiTemplate, keywords: [], aiQuota: 0 });
     deps.getModel = async () => { throw new Error("should not be called"); };

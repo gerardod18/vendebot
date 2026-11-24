@@ -9,6 +9,7 @@ import { CreateWorkspace } from "./pages/CreateWorkspace";
 import { Errors } from "./pages/Errors";
 import { Home } from "./pages/Home";
 import { Inbox } from "./pages/Inbox";
+import { Platform } from "./pages/Platform";
 import { Knowledge } from "./pages/Knowledge";
 import { AcceptInvite, DeletionStatus, Privacy, Terms } from "./pages/Public";
 import { Settings } from "./pages/Settings";
@@ -50,6 +51,7 @@ export function App() {
                     <Route path="usage" element={<Usage />} />
                     <Route path="settings" element={<Settings />} />
                     <Route path="errors" element={<Errors />} />
+                    <Route path="platform" element={<Platform />} />
                     <Route path="*" element={<Home />} />
                   </Route>
                 </Routes>

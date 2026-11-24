@@ -4,10 +4,6 @@ import { api } from "../../convex/_generated/api";
 import { Btn, Card, ErrorText, Field, PageTitle, fmtTime, inputCls, useRun } from "../components/ui";
 import { useOrg } from "../lib/org";
 
-const MODELS = {
-  anthropic: ["claude-haiku-5-5", "claude-sonnet-5-5"],
-  openrouter: ["anthropic/claude-haiku-5-5", "anthropic/claude-sonnet-5-5", "openai/gpt-5-mini", "google/gemini-2.5-flash", "meta-llama/llama-3.3-70b-instruct"],
-} as const;
 const DAYS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 
 export function Settings() {
@@ -17,47 +13,10 @@ export function Settings() {
     <>
       <PageTitle title="Ajustes" />
       <div className="space-y-4">
-        <AiSettings /><BusinessSettings /><Team />
+        <BusinessSettings /><Team />
         <p className="text-xs text-ink-soft">Espacio de trabajo: {org.name}</p>
       </div>
     </>
-  );
-}
-
-function AiSettings() {
-  const { org } = useOrg();
-  const s = useQuery(api.orgs.getSettings, { orgId: org.orgId });
-  const save = useMutation(api.orgs.setAiConfig);
-  const [provider, setProvider] = useState<"anthropic" | "openrouter">("anthropic");
-  const [model, setModel] = useState("");
-  const [key, setKey] = useState("");
-  const { runOk, run, busy, error } = useRun();
-  const [saved, setSaved] = useState(false);
-  useEffect(() => { if (s) { setProvider(s.aiProvider); setModel(s.aiModel); } }, [s?.aiProvider, s?.aiModel]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  async function submit(e: FormEvent) {
-    e.preventDefault();
-    if (await runOk(() => save({ orgId: org.orgId, provider, model, ...(key ? { apiKey: key } : {}) }))) { setKey(""); setSaved(true); }
-  }
-  return (
-    <Card>
-      <h2 className="mb-2 font-medium">Inteligencia artificial</h2>
-      <form onSubmit={submit} className="space-y-3">
-        <Field label="Proveedor"><select className={inputCls} value={provider} onChange={(e) => { const p = e.target.value as "anthropic" | "openrouter"; setProvider(p); setModel(MODELS[p][0]); }}>
-          <option value="anthropic">Anthropic (Claude)</option><option value="openrouter">OpenRouter (muchos modelos)</option></select></Field>
-        <Field label="Modelo" hint={provider === "openrouter" ? "Formato proveedor/modelo, ver openrouter.ai/models" : "Haiku es el más económico; Sonnet es más inteligente."}>
-          <input className={inputCls} list="models" value={model} onChange={(e) => setModel(e.target.value)} required />
-          <datalist id="models">{MODELS[provider].map((m) => <option key={m} value={m} />)}</datalist></Field>
-        <Field label={`Tu propia clave de API (opcional)${s?.hasByoKey ? " · ya hay una guardada" : ""}`} hint="Con tu clave no hay límite mensual de respuestas de IA. Se guarda cifrada. Déjalo vacío para no cambiarla; usa «Quitar clave» para borrarla.">
-          <input className={inputCls} type="password" autoComplete="off" value={key} onChange={(e) => setKey(e.target.value)} placeholder={provider === "openrouter" ? "sk-or-…" : "sk-ant-…"} /></Field>
-        <ErrorText error={error} />
-        <div className="flex items-center gap-2">
-          <Btn disabled={busy}>Guardar</Btn>
-          {s?.hasByoKey && <Btn type="button" variant="ghost" onClick={() => run(() => save({ orgId: org.orgId, provider, model, apiKey: "" }))}>Quitar clave</Btn>}
-          {saved && !error && <span className="text-sm text-ok">Guardado</span>}
-        </div>
-      </form>
-    </Card>
   );
 }
 

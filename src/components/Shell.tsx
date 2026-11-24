@@ -1,4 +1,6 @@
+import { useQuery } from "convex/react";
 import { NavLink, Outlet, useNavigate } from "react-router";
+import { api } from "../../convex/_generated/api";
 import { authClient } from "../lib/auth-client";
 import { useOrg } from "../lib/org";
 
@@ -16,6 +18,8 @@ const NAV: { to: string; label: string; admin?: boolean }[] = [
 export function Shell() {
   const { org, orgs, setOrgId, isAdmin } = useOrg();
   const nav = useNavigate();
+  const platform = useQuery(api.platform.me);
+  const items = [...NAV.filter((n) => !n.admin || isAdmin), ...(platform?.isSuperAdmin || platform?.canClaim ? [{ to: "/platform", label: "Plataforma" }] : [])];
   return (
     <div className="min-h-screen md:flex">
       <aside className="border-b border-line bg-surface md:sticky md:top-0 md:h-screen md:w-56 md:shrink-0 md:border-b-0 md:border-r">
@@ -31,7 +35,7 @@ export function Shell() {
           </div>
         </div>
         <nav aria-label="Principal" className="flex gap-1 overflow-x-auto px-2 pb-2 md:flex-col md:overflow-visible md:pb-0">
-          {NAV.filter((n) => !n.admin || isAdmin).map((n) => (
+          {items.map((n) => (
             <NavLink key={n.to} to={n.to} end={n.to === "/"}
               className={({ isActive }) => `whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium ${isActive ? "bg-brand-wash text-brand" : "text-ink-soft hover:bg-ground"}`}>
               {n.label}
