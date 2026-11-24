@@ -1,6 +1,6 @@
 import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { exchangeUnifiedCode, fetchAssignedInstagramAccounts } from "./instagram/oauth";
+import { exchangeUnifiedCode, fetchAssignedInstagramAccounts, oauthRedirectUri } from "./instagram/oauth";
 import { parseWebhook } from "./instagram/parse";
 import { parseWhatsApp } from "./whatsapp/parse";
 import { parseSignedRequest } from "./instagram/signedRequest";
@@ -66,11 +66,10 @@ export const oauthCallback = httpAction(async (ctx, request) => {
   const who = await ctx.runMutation(internal.accounts.consumeState, { state });
   if (!who) return back("/accounts?error=state");
 
-  const appId = process.env.META_APP_ID, appSecret = process.env.META_APP_SECRET, site = process.env.CONVEX_SITE_URL;
+  const appId = process.env.META_APP_ID, appSecret = process.env.META_APP_SECRET, redirectUri = oauthRedirectUri();
   const encKey = process.env.TOKEN_ENCRYPTION_KEY;
-  if (!appId || !appSecret || !site || !encKey) return back("/accounts?error=config");
+  if (!appId || !appSecret || !redirectUri || !encKey) return back("/accounts?error=config");
   try {
-    const redirectUri = `${site}/meta/oauth/callback`;
     const tok = await exchangeUnifiedCode({ code, appId, appSecret, redirectUri, graphVersion: process.env.META_GRAPH_VERSION });
     const accounts = await fetchAssignedInstagramAccounts(tok.accessToken, process.env.META_GRAPH_VERSION);
     if (accounts.length === 0) return back("/accounts?error=noaccount");
