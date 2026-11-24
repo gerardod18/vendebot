@@ -12,6 +12,8 @@ export type IgClientConfig = {
   accessToken: string;
   igUserId: string;
   graphVersion?: string; // default v24.0, override via META_GRAPH_VERSION
+  /** Graph host. Defaults from META_LOGIN_MODE (see igLoginMode). */
+  host?: string;
   fetch?: FetchLike;
 };
 
@@ -34,6 +36,18 @@ export class IgApiError extends Error {
 }
 
 const GRAPH = "https://graph.instagram.com";
+export const FB_GRAPH = "https://graph.facebook.com";
+
+/**
+ * Which Meta login setup the app uses:
+ *  - "instagram": classic "API setup with Instagram login" (graph.instagram.com, instagram_business_* scopes).
+ *  - "unified": newer apps ("Unified login": Facebook Login for Business + system-user token, graph.facebook.com).
+ * Selected with the META_LOGIN_MODE env var (default "instagram").
+ */
+export function igLoginMode(): "instagram" | "unified" {
+  return process.env.META_LOGIN_MODE === "unified" ? "unified" : "instagram";
+}
+export const defaultGraphHost = () => (igLoginMode() === "unified" ? FB_GRAPH : GRAPH);
 
 export function buildSendBody(
   target: SendTarget,
@@ -73,7 +87,7 @@ export function parseApiError(status: number, json: any): IgApiError {
 
 export function createIgClient(cfg: IgClientConfig) {
   const f: FetchLike = cfg.fetch ?? ((url, init) => fetch(url, init));
-  const base = `${GRAPH}/${cfg.graphVersion ?? "v24.0"}`;
+  const base = `${cfg.host ?? defaultGraphHost()}/${cfg.graphVersion ?? "v24.0"}`;
 
   async function call(path: string, init: { method: "GET" | "POST"; body?: unknown; query?: Record<string, string> }) {
     const qs = init.query ? `?${new URLSearchParams(init.query)}` : "";
