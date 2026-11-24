@@ -6,7 +6,7 @@ const NAV: { to: string; label: string; admin?: boolean }[] = [
   { to: "/", label: "Inicio" },
   { to: "/inbox", label: "Bandeja" },
   { to: "/automations", label: "Automatizaciones" },
-  { to: "/accounts", label: "Instagram" },
+  { to: "/accounts", label: "Cuentas" },
   { to: "/knowledge", label: "Conocimiento" },
   { to: "/usage", label: "Uso" },
   { to: "/settings", label: "Ajustes" },
