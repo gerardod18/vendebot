@@ -18,14 +18,14 @@ export function Errors() {
       <PageTitle title="Errores recientes" />
       <Card className="mb-4">
         <h2 className="mb-2 font-medium">Automatizaciones que fallaron</h2>
-        {runs?.length === 0 && <p className="text-sm text-zinc-500">Sin errores 🎉</p>}
+        {runs?.length === 0 && <p className="text-sm text-ink-soft">Sin errores 🎉</p>}
         <ul className="divide-y text-sm">{(runs ?? []).map((r) => (
           <li key={r.runId} className="py-2"><span className="font-mono text-xs">{r.error.split(":")[0]}</span> · {r.contact ?? "?"} · {fmtTime(r.at)}
-            {HELP[r.error] && <p className="text-xs text-zinc-500">{HELP[r.error]}</p>}</li>))}</ul>
+            {HELP[r.error] && <p className="text-xs text-ink-soft">{HELP[r.error]}</p>}</li>))}</ul>
       </Card>
       <Card>
         <h2 className="mb-2 font-medium">Eventos con error</h2>
-        {events?.length === 0 && <p className="text-sm text-zinc-500">Sin errores.</p>}
+        {events?.length === 0 && <p className="text-sm text-ink-soft">Sin errores.</p>}
         <ul className="divide-y text-sm">{(events ?? []).map((e, i) => <li key={i} className="py-2">{e.type} · {e.error} · {fmtTime(e.at)}</li>)}</ul>
       </Card>
     </>

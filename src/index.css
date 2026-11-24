@@ -1,1 +1,62 @@
 @import "tailwindcss";
+@import "@xyflow/react/dist/style.css";
+
+/*
+ * Design tokens. One family (Onest), a cool neutral ground, a single cobalt accent for actions.
+ * Channel colors appear only on channel badges; block colors on the flow canvas encode the block type.
+ */
+@theme {
+  --font-sans: "Onest", ui-sans-serif, system-ui, sans-serif;
+
+  --color-ground: #f4f5f8;
+  --color-surface: #ffffff;
+  --color-ink: #12182b;
+  --color-ink-soft: #4a5268;
+  --color-ink-faint: #737b92;
+  --color-line: #e1e4ec;
+  --color-line-strong: #c9cedb;
+
+  --color-brand: #2447d6;
+  --color-brand-strong: #1a37ad;
+  --color-brand-wash: #e8edfd;
+
+  --color-ok: #14753f;
+  --color-ok-wash: #e3f5ea;
+  --color-warn: #8a5a00;
+  --color-warn-wash: #fff3d6;
+  --color-danger: #b42318;
+  --color-danger-wash: #fde8e6;
+
+  --color-instagram: #b3237e;
+  --color-whatsapp: #0f7a43;
+
+  /* block types on the flow canvas */
+  --color-blk-message: #2447d6;
+  --color-blk-ask: #0e7490;
+  --color-blk-filter: #a16207;
+  --color-blk-ai: #6d3fd0;
+  --color-blk-action: #475569;
+  --color-blk-wait: #64748b;
+  --color-blk-handoff: #b4233a;
+}
+
+html { background: var(--color-ground); }
+body { font-family: var(--font-sans); color: var(--color-ink); background: var(--color-ground); font-feature-settings: "tnum" 1; }
+
+:focus-visible { outline: 2px solid var(--color-brand); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+/* React Flow tuning */
+.react-flow { --xy-background-color-default: #f8f9fc; --xy-minimap-background-color-default: #ffffff; --xy-edge-stroke-default: var(--color-line-strong); --xy-edge-stroke-width-default: 2; }
+.react-flow__handle { width: 12px; height: 12px; border: 2px solid var(--color-surface); background: var(--color-ink-faint); }
+.react-flow__handle:hover { background: var(--color-brand); }
+.react-flow__node.selected .flow-block { outline: 2px solid var(--color-brand); outline-offset: 2px; }
+.react-flow__controls-button { background: var(--color-surface); color: var(--color-ink); border-bottom: 1px solid var(--color-line); }
+.react-flow__controls-button:hover { background: var(--color-brand-wash); }
+.react-flow__controls-button svg { fill: currentColor; }
+
+/* Tailwind v4 borders default to currentColor; keep them soft everywhere. */
+*, ::after, ::before, ::backdrop, ::file-selector-button { border-color: var(--color-line); }

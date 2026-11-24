@@ -12,13 +12,13 @@ const DAYS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 
 export function Settings() {
   const { org, isAdmin } = useOrg();
-  if (!isAdmin) return <p className="text-sm text-zinc-500">Solo los administradores pueden cambiar los ajustes.</p>;
+  if (!isAdmin) return <p className="text-sm text-ink-soft">Solo los administradores pueden cambiar los ajustes.</p>;
   return (
     <>
       <PageTitle title="Ajustes" />
       <div className="space-y-4">
         <AiSettings /><BusinessSettings /><Team />
-        <p className="text-xs text-zinc-500">Espacio de trabajo: {org.name}</p>
+        <p className="text-xs text-ink-soft">Espacio de trabajo: {org.name}</p>
       </div>
     </>
   );
@@ -54,7 +54,7 @@ function AiSettings() {
         <div className="flex items-center gap-2">
           <Btn disabled={busy}>Guardar</Btn>
           {s?.hasByoKey && <Btn type="button" variant="ghost" onClick={() => run(() => save({ orgId: org.orgId, provider, model, apiKey: "" }))}>Quitar clave</Btn>}
-          {saved && !error && <span className="text-sm text-emerald-700">Guardado</span>}
+          {saved && !error && <span className="text-sm text-ok">Guardado</span>}
         </div>
       </form>
     </Card>
@@ -99,7 +99,7 @@ function BusinessSettings() {
         <Field label="Cómo debe hablar tu asistente" hint="Qué vendes, tono, qué NO debe prometer. Los precios y stock solo se dicen si están en «Conocimiento».">
           <textarea className={inputCls} rows={5} value={instr} onChange={(e) => setInstr(e.target.value)} maxLength={4000} /></Field>
         <ErrorText error={error} />
-        <div className="flex items-center gap-2"><Btn disabled={busy}>Guardar</Btn>{saved && !error && <span className="text-sm text-emerald-700">Guardado</span>}</div>
+        <div className="flex items-center gap-2"><Btn disabled={busy}>Guardar</Btn>{saved && !error && <span className="text-sm text-ok">Guardado</span>}</div>
       </form>
     </Card>
   );
@@ -137,7 +137,7 @@ function Team() {
         <li key={i.id} className="flex items-center gap-2"><span>{i.email} ({i.role}) · vence {fmtTime(i.expiresAt)}</span>
           <button className="underline" onClick={() => navigator.clipboard?.writeText(link(i.token))}>Copiar enlace</button>
           <button className="underline" onClick={() => run(() => revoke({ orgId: org.orgId, inviteId: i.id }))}>Revocar</button></li>))}</ul>}
-      <p className="mt-2 text-xs text-zinc-500">Comparte el enlace de invitación con la persona (aún no enviamos correos).</p>
+      <p className="mt-2 text-xs text-ink-soft">Comparte el enlace de invitación con la persona (aún no enviamos correos).</p>
     </Card>
   );
 }

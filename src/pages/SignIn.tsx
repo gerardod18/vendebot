@@ -33,12 +33,12 @@ export function SignIn() {
           value={email} onChange={(e) => setEmail(e.target.value)} />
         <input className="w-full rounded border px-3 py-2" type="password" placeholder="Contraseña" required
           minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} />
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <button disabled={busy} className="w-full rounded bg-zinc-900 py-2 text-white disabled:opacity-50">
+        {error && <p className="text-sm text-danger">{error}</p>}
+        <button disabled={busy} className="w-full rounded bg-ink py-2 text-white disabled:opacity-50">
           {mode === "signIn" ? "Entrar" : "Crear cuenta"}
         </button>
       </form>
-      <button className="mt-3 text-sm text-zinc-600 underline"
+      <button className="mt-3 text-sm text-ink-soft underline"
         onClick={() => setMode(mode === "signIn" ? "signUp" : "signIn")}>
         {mode === "signIn" ? "¿No tienes cuenta? Regístrate" : "¿Ya tienes cuenta? Entra"}
       </button>

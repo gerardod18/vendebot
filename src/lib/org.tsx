@@ -24,7 +24,7 @@ export function OrgProvider({ children, empty }: { children: ReactNode; empty: R
     const org = orgs.find((o) => o.orgId === selected) ?? orgs[0];
     return { org, orgs, setOrgId: (id) => setSelected(id), isAdmin: org.role !== "agent" };
   }, [orgs, selected]);
-  if (orgs === undefined) return <div className="p-8 text-sm text-zinc-500">Cargando…</div>;
+  if (orgs === undefined) return <div className="p-8 text-sm text-ink-soft">Cargando…</div>;
   if (!value) return <>{empty}</>;
   return <OrgCtx.Provider value={value}>{children}</OrgCtx.Provider>;
 }

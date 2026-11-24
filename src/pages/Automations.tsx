@@ -1,153 +1,139 @@
-import { useState, type FormEvent } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
-import { Btn, Card, ErrorText, Field, PageTitle, inputCls, useRun } from "../components/ui";
+import { AutomationForm, GROUP_ORDER, TEMPLATES, TYPE_TO_KEY } from "../components/AutomationForm";
+import { FlowEditor } from "../components/flow/FlowEditor";
+import { Btn, ChannelBadge, ErrorText, Notice, PageTitle, Toggle, useRun, type Channel } from "../components/ui";
 import { useOrg } from "../lib/org";
-
-type Key = "defaultReply" | "keywordReply" | "welcome" | "commentToDm" | "storyMention";
-const TEMPLATES: Record<Key, { title: string; desc: string }> = {
-  defaultReply: { title: "Respuesta por defecto", desc: "Responde cuando ningún otro automatismo aplica. En horario laboral puede contestar la IA; fuera de horario, un mensaje fijo." },
-  keywordReply: { title: "Respuesta por palabra clave", desc: "Responde cuando el mensaje contiene ciertas palabras (p. ej. «precio»)." },
-  welcome: { title: "Mensaje de bienvenida", desc: "Se envía la primera vez que alguien te escribe." },
-  commentToDm: { title: "Comentario → mensaje privado", desc: "Cuando comentan en una publicación, les escribes por DM (y opcionalmente respondes en público)." },
-  storyMention: { title: "Mención en historia", desc: "Agradece cuando te mencionan en una historia." },
-};
-const TYPE_LABEL: Record<string, string> = { default: "Por defecto", keyword: "Palabra clave", welcome: "Bienvenida", comment: "Comentario", storyMention: "Historia" };
 
 export function Automations() {
   const { org, isAdmin } = useOrg();
   const list = useQuery(api.automations.list, { orgId: org.orgId });
+  const accountRows = useQuery(api.accounts.list, { orgId: org.orgId });
   const setEnabled = useMutation(api.automations.setEnabled);
-  const remove = useMutation(api.automations.remove);
-  const [creating, setCreating] = useState(false);
+  const [selected, setSelected] = useState<Id<"triggers"> | "new" | null>(null);
   const { run, error } = useRun();
+
+  const accounts = useMemo(
+    () => (accountRows ?? []).map((a) => ({ accountId: a.accountId, username: a.username, channel: a.channel as Channel, status: a.status })),
+    [accountRows],
+  );
+  const accountOf = (id: Id<"igAccounts">) => accounts.find((a) => a.accountId === id);
+
+  const groups = GROUP_ORDER.map((k) => ({ key: k, items: (list ?? []).filter((a) => TYPE_TO_KEY[a.type] === k) })).filter((g) => g.items.length > 0);
 
   return (
     <>
-      <PageTitle title="Automatizaciones">{isAdmin && !creating && <Btn onClick={() => setCreating(true)}>Nueva</Btn>}</PageTitle>
-      {creating && <NewAutomation onDone={() => setCreating(false)} />}
+      <PageTitle title="Automatizaciones">{isAdmin && <Btn onClick={() => setSelected("new")}>Nueva automatización</Btn>}</PageTitle>
       <ErrorText error={error} />
-      <div className="space-y-2">
-        {(list ?? []).map((a) => (
-          <Card key={a.triggerId} className="flex items-center gap-3">
-            <div className="flex-1">
-              <p className="font-medium">{a.name}</p>
-              <p className="text-xs text-zinc-500">
-                {TYPE_LABEL[a.type] ?? a.type}
-                {a.config?.keywords?.length ? ` · ${a.config.keywords.join(", ")}` : ""} · enviada {a.firedCount} {a.firedCount === 1 ? "vez" : "veces"}
-              </p>
+      <div className="grid gap-5 lg:grid-cols-[320px_minmax(0,1fr)]">
+        <nav aria-label="Automatizaciones" className="space-y-5">
+          {list?.length === 0 && (
+            <p className="text-sm text-ink-soft">Todavía no tienes automatizaciones. Crea la primera con «Nueva automatización»: una bienvenida o una respuesta a la palabra «precio» funcionan bien.</p>
+          )}
+          {groups.map((g) => (
+            <section key={g.key} aria-labelledby={`g-${g.key}`}>
+              <h2 id={`g-${g.key}`} className="mb-1.5 px-1 text-sm font-semibold text-ink-soft">{TEMPLATES[g.key].group}</h2>
+              <ul className="space-y-1.5">
+                {g.items.map((a) => {
+                  const acc = accountOf(a.igAccountId);
+                  const on = selected === a.triggerId;
+                  return (
+                    <li key={a.triggerId} className={`flex items-center gap-2 rounded-lg border bg-surface pr-3 ${on ? "border-brand ring-1 ring-brand" : "border-line"}`}>
+                      <button type="button" onClick={() => setSelected(a.triggerId)} aria-current={on} className="min-w-0 flex-1 px-3 py-2.5 text-left">
+                        <span className="block truncate text-sm font-medium">{a.name}</span>
+                        <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-soft">
+                          {acc && <ChannelBadge channel={acc.channel} />}
+                          {a.config?.keywords?.length ? <span className="truncate">{a.config.keywords.join(", ")}</span> : null}
+                          <span>{a.firedCount} {a.firedCount === 1 ? "envío" : "envíos"}</span>
+                        </span>
+                      </button>
+                      {isAdmin && <Toggle checked={a.enabled} label={`${a.enabled ? "Desactivar" : "Activar"} ${a.name}`}
+                        onChange={(v) => run(() => setEnabled({ orgId: org.orgId, triggerId: a.triggerId, enabled: v }))} />}
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          ))}
+        </nav>
+
+        <section aria-live="polite" className="min-w-0">
+          {selected === "new" && (
+            <div className="rounded-lg border border-line bg-surface p-5">
+              <h2 className="mb-4 text-lg font-semibold">Nueva automatización</h2>
+              <AutomationForm accounts={accounts} onDone={(id) => setSelected(id ?? null)} />
             </div>
-            {isAdmin && (
-              <>
-                <label className="flex items-center gap-1 text-sm">
-                  <input type="checkbox" checked={a.enabled} onChange={(e) => run(() => setEnabled({ orgId: org.orgId, triggerId: a.triggerId, enabled: e.target.checked }))} /> Activa
-                </label>
-                <Btn variant="ghost" onClick={() => confirm("¿Eliminar esta automatización?") && run(() => remove({ orgId: org.orgId, triggerId: a.triggerId }))}>Eliminar</Btn>
-              </>
-            )}
-          </Card>
-        ))}
-        {list?.length === 0 && !creating && <p className="text-sm text-zinc-500">Todavía no tienes automatizaciones. Crea la primera con «Nueva».</p>}
+          )}
+          {selected && selected !== "new" && <Detail key={selected} triggerId={selected} accounts={accounts} onGone={() => setSelected(null)} />}
+          {!selected && list && list.length > 0 && (
+            <div className="rounded-lg border border-dashed border-line-strong p-6 text-sm text-ink-soft">Elige una automatización para ver cómo responde y editarla.</div>
+          )}
+        </section>
       </div>
     </>
   );
 }
 
-function NewAutomation({ onDone }: { onDone: () => void }) {
-  const { org } = useOrg();
-  const accounts = useQuery(api.accounts.list, { orgId: org.orgId });
-  const create = useMutation(api.automations.create);
-  const { runOk, busy, error } = useRun();
+function Detail({ triggerId, accounts, onGone }: { triggerId: Id<"triggers">; accounts: { accountId: Id<"igAccounts">; username: string; channel: Channel; status: string }[]; onGone: () => void }) {
+  const { org, isAdmin } = useOrg();
+  const a = useQuery(api.automations.get, { orgId: org.orgId, triggerId });
+  const saveGraph = useMutation(api.automations.saveGraph);
+  const remove = useMutation(api.automations.remove);
+  const [tab, setTab] = useState<"flow" | "settings">("flow");
+  const [editing, setEditing] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const { run, runOk, busy, error } = useRun();
 
-  const [key, setKey] = useState<Key>("keywordReply");
-  const [account, setAccount] = useState<string>("");
-  const [name, setName] = useState("");
-  const [text, setText] = useState("");
-  const [keywords, setKeywords] = useState("");
-  const [match, setMatch] = useState<"contains" | "exact">("contains");
-  const [handoff, setHandoff] = useState(false);
-  const [publicReply, setPublicReply] = useState("");
-  const [mediaIds, setMediaIds] = useState("");
-  const [fallback, setFallback] = useState("Gracias por escribirnos. Te respondemos en unos minutos.");
-  const [useAi, setUseAi] = useState(false);
-  const [aiInstr, setAiInstr] = useState("");
-  const [exitWhen, setExitWhen] = useState("");
-
-  const active = (accounts ?? []).filter((a) => a.status === "active");
-  const split = (s: string) => s.split(",").map((x) => x.trim()).filter(Boolean);
-
-  async function submit(e: FormEvent) {
-    e.preventDefault();
-    const igAccountId = (account || active[0]?.accountId) as Id<"igAccounts"> | undefined;
-    if (!igAccountId) return;
-    const template =
-      key === "defaultReply"
-        ? { key, fallbackText: fallback, ...(useAi ? { ai: { instructions: aiInstr, ...(exitWhen ? { exitWhen } : {}) } } : {}) }
-        : { key, text, ...(handoff ? { handoffAfter: true } : {}) };
-    const ok = await runOk(() => create({
-      orgId: org.orgId, igAccountId, name: name || TEMPLATES[key].title, template,
-      keywords: key === "keywordReply" || key === "commentToDm" ? split(keywords) : undefined,
-      match: key === "keywordReply" || key === "commentToDm" ? match : undefined,
-      mediaIds: key === "commentToDm" && mediaIds ? split(mediaIds) : undefined,
-      publicReply: key === "commentToDm" && publicReply ? publicReply : undefined,
-    }));
-    if (ok) onDone();
-  }
-
-  if (accounts && active.length === 0) {
-    return <Card className="mb-4"><p className="text-sm">Primero conecta una cuenta de Instagram (menú «Instagram»).</p><Btn variant="ghost" className="mt-2" onClick={onDone}>Cerrar</Btn></Card>;
-  }
+  if (a === undefined) return <p className="text-sm text-ink-soft">Cargando…</p>;
+  if (a === null) return <p className="text-sm text-ink-soft">Esta automatización ya no existe.</p>;
+  const acc = accounts.find((x) => x.accountId === a.igAccountId);
 
   return (
-    <Card className="mb-4">
-      <form onSubmit={submit} className="space-y-3">
-        <Field label="Tipo" hint={TEMPLATES[key].desc}>
-          <select className={inputCls} value={key} onChange={(e) => setKey(e.target.value as Key)}>
-            {(Object.keys(TEMPLATES) as Key[]).map((k) => <option key={k} value={k}>{TEMPLATES[k].title}</option>)}
-          </select>
-        </Field>
-        {active.length > 1 && (
-          <Field label="Cuenta"><select className={inputCls} value={account} onChange={(e) => setAccount(e.target.value)}>
-            {active.map((a) => <option key={a.accountId} value={a.accountId}>@{a.username}</option>)}</select></Field>
+    <div className="space-y-4">
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold">{a.name}</h2>
+          <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-ink-soft">
+            {acc && <ChannelBadge channel={acc.channel} />}
+            <span>{TEMPLATES[TYPE_TO_KEY[a.type]].title}</span>
+            <span>Versión {a.version}</span>
+          </p>
+        </div>
+        {isAdmin && (
+          <Btn variant="ghost" onClick={async () => { if (confirm("¿Eliminar esta automatización?")) { if (await runOk(() => remove({ orgId: org.orgId, triggerId }))) onGone(); } }}>Eliminar</Btn>
         )}
-        <Field label="Nombre (opcional)"><input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} maxLength={80} /></Field>
+      </header>
 
-        {(key === "keywordReply" || key === "commentToDm") && (
-          <>
-            <Field label={key === "commentToDm" ? "Palabras clave (opcional)" : "Palabras clave"} hint="Separadas por comas. No distingue mayúsculas ni acentos.">
-              <input className={inputCls} value={keywords} onChange={(e) => setKeywords(e.target.value)} required={key === "keywordReply"} />
-            </Field>
-            <Field label="Coincidencia"><select className={inputCls} value={match} onChange={(e) => setMatch(e.target.value as "contains" | "exact")}>
-              <option value="contains">Contiene la palabra</option><option value="exact">Mensaje exacto</option></select></Field>
-          </>
-        )}
-        {key === "commentToDm" && (
-          <>
-            <Field label="Respuesta pública (opcional)" hint="Se publica bajo el comentario, p. ej. «¡Te escribí por DM!»."><input className={inputCls} value={publicReply} onChange={(e) => setPublicReply(e.target.value)} maxLength={300} /></Field>
-            <Field label="Solo estas publicaciones (opcional)" hint="IDs de publicación separados por comas. Vacío = todas."><input className={inputCls} value={mediaIds} onChange={(e) => setMediaIds(e.target.value)} /></Field>
-          </>
-        )}
-        {key !== "defaultReply" ? (
-          <>
-            <Field label="Mensaje" hint="Puedes usar {{first_name}} para el nombre."><textarea className={inputCls} rows={3} value={text} onChange={(e) => setText(e.target.value)} required maxLength={1000} /></Field>
-            <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={handoff} onChange={(e) => setHandoff(e.target.checked)} /> Pasar la conversación a una persona después</label>
-          </>
-        ) : (
-          <>
-            <Field label="Mensaje cuando la IA no está disponible" hint="Fuera de horario o si se acabó la cuota de IA."><textarea className={inputCls} rows={2} value={fallback} onChange={(e) => setFallback(e.target.value)} required /></Field>
-            <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={useAi} onChange={(e) => setUseAi(e.target.checked)} /> Que responda la IA en horario laboral</label>
-            {useAi && (
-              <>
-                <Field label="Instrucciones para la IA" hint="Qué debe lograr en la conversación. Lo que sabe de tu negocio sale de «Conocimiento»."><textarea className={inputCls} rows={4} value={aiInstr} onChange={(e) => setAiInstr(e.target.value)} required maxLength={4000} /></Field>
-                <Field label="Cuándo terminar (opcional)" hint="Ej.: cuando el cliente deje su teléfono."><input className={inputCls} value={exitWhen} onChange={(e) => setExitWhen(e.target.value)} maxLength={500} /></Field>
-              </>
-            )}
-          </>
-        )}
-        <ErrorText error={error} />
-        <div className="flex gap-2"><Btn disabled={busy}>Crear</Btn><Btn type="button" variant="ghost" onClick={onDone}>Cancelar</Btn></div>
-      </form>
-    </Card>
+      <div role="tablist" aria-label="Secciones" className="flex gap-1 border-b border-line">
+        {([["flow", "Flujo"], ["settings", "Ajustes"]] as const).map(([k, label]) => (
+          <button key={k} role="tab" aria-selected={tab === k} type="button" onClick={() => { setTab(k); setSaved(false); }}
+            className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium ${tab === k ? "border-brand text-brand" : "border-transparent text-ink-soft"}`}>{label}</button>
+        ))}
+      </div>
+
+      {saved && <Notice>Cambios guardados. La nueva versión ya responde a tus clientes.</Notice>}
+
+      {tab === "flow" && (
+        <>
+          {isAdmin && !editing && a.graph && <Btn onClick={() => setEditing(true)}>Editar flujo</Btn>}
+          {a.graph ? (
+            <FlowEditor key={`${a.version}:${editing}`} graph={a.graph} layout={a.layout} editing={editing && isAdmin} saving={busy} error={error}
+              onCancel={() => setEditing(false)}
+              onSave={async (graph, layout) => {
+                const r = await run(() => saveGraph({ orgId: org.orgId, triggerId, graph, layout }));
+                if (r) { setEditing(false); setSaved(true); }
+              }} />
+          ) : <p className="text-sm text-ink-soft">Esta automatización todavía no tiene un flujo.</p>}
+        </>
+      )}
+
+      {tab === "settings" && (
+        <div className="rounded-lg border border-line bg-surface p-5">
+          <AutomationForm accounts={accounts} existing={{ ...a, templateKey: a.templateKey }} onDone={() => setSaved(true)} />
+        </div>
+      )}
+    </div>
   );
 }
