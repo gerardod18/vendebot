@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { internalAction, internalMutation, internalQuery, type MutationCtx } from "./_generated/server";
-import { buildUnifiedAuthUrl } from "./instagram/oauth";
+import { buildUnifiedAuthUrl, oauthRedirectUri } from "./instagram/oauth";
 import { createIgClient } from "./instagram/client";
 import { createWhatsAppClient } from "./whatsapp/client";
 import { decryptSecret, encryptSecret } from "./lib/crypto";
@@ -25,12 +25,11 @@ export const startConnect = orgAdminMutation({
   args: {},
   handler: async (ctx) => {
     const appId = process.env.META_APP_ID;
-    const site = process.env.CONVEX_SITE_URL;
-    if (!appId || !site) throw new Error("Instagram connection is not configured (META_APP_ID / CONVEX_SITE_URL)");
+    const redirectUri = oauthRedirectUri();
+    if (!appId || !redirectUri) throw new Error("Instagram connection is not configured (META_APP_ID / CONVEX_SITE_URL)");
     const bytes = crypto.getRandomValues(new Uint8Array(24));
     const state = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
     await ctx.db.insert("oauthStates", { orgId: ctx.orgId, userId: ctx.userId, state, expiresAt: Date.now() + 10 * 60_000 });
-    const redirectUri = `${site}/meta/oauth/callback`;
     const configId = process.env.META_CONFIG_ID;
     if (!configId) throw new Error("Instagram connection needs META_CONFIG_ID (the login configuration id from the Meta dashboard)");
     return { url: buildUnifiedAuthUrl({ appId, configId, redirectUri, state }) };

@@ -8,6 +8,15 @@ import { FB_GRAPH, parseApiError, type FetchLike } from "./client";
 // ---- Unified login (Facebook Login for Business + system-user token) ----
 // ⚠ UNVERIFIED against live Meta: written from Meta's "Instagram API with Unified Login" docs (Nov 2026).
 
+/**
+ * Public URL of this backend's HTTP actions, used to build the OAuth redirect URI.
+ * META_PUBLIC_URL overrides CONVEX_SITE_URL (needed when developing behind a tunnel, since Meta can't reach 127.0.0.1).
+ */
+export function oauthRedirectUri(): string | null {
+  const base = process.env.META_PUBLIC_URL ?? process.env.CONVEX_SITE_URL;
+  return base ? `${base.replace(/\/+$/, "")}/meta/oauth/callback` : null;
+}
+
 /** Business token never expires unless the configuration says so; refresh is skipped for these. */
 export const UNIFIED_TOKEN_TTL_MS = 10 * 365 * 24 * 3600_000;
 
