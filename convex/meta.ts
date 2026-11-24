@@ -1,8 +1,8 @@
 import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { exchangeLongLivedToken, igLoginMode } from "./instagram/client";
-import { exchangeCode, exchangeUnifiedCode, fetchAssignedInstagramAccounts, fetchOwnProfile } from "./instagram/oauth";
+import { exchangeUnifiedCode, fetchAssignedInstagramAccounts } from "./instagram/oauth";
 import { parseWebhook } from "./instagram/parse";
+import { parseWhatsApp } from "./whatsapp/parse";
 import { parseSignedRequest } from "./instagram/signedRequest";
 import { encryptSecret } from "./lib/crypto";
 import { verifySignature } from "./instagram/signature";
@@ -36,7 +36,7 @@ export const receiveWebhook = httpAction(async (ctx, request) => {
     return new Response("Bad request", { status: 400 });
   }
 
-  const events = parseWebhook(body);
+  const events = (body as { object?: string } | null)?.object === "whatsapp_business_account" ? parseWhatsApp(body) : parseWebhook(body);
   if (events.length > 0) {
     const { accepted } = await ctx.runMutation(internal.engine.ingest.ingestEvents, { events });
     // Process each NEW event asynchronously so Meta gets its 200 fast (D10: scheduler, not Workpool).
@@ -71,30 +71,17 @@ export const oauthCallback = httpAction(async (ctx, request) => {
   if (!appId || !appSecret || !site || !encKey) return back("/accounts?error=config");
   try {
     const redirectUri = `${site}/meta/oauth/callback`;
-    if (igLoginMode() === "unified") {
-      const tok = await exchangeUnifiedCode({ code, appId, appSecret, redirectUri, graphVersion: process.env.META_GRAPH_VERSION });
-      const accounts = await fetchAssignedInstagramAccounts(tok.accessToken, process.env.META_GRAPH_VERSION);
-      if (accounts.length === 0) return back("/accounts?error=noaccount");
-      const tokenEnc = await encryptSecret(tok.accessToken, encKey);
-      for (const acc of accounts) {
-        const accountId = await ctx.runMutation(internal.accounts.upsertAccount, {
-          orgId: who.orgId, userId: who.userId, igUserId: acc.igUserId, username: acc.username,
-          tokenEnc, tokenExpiresAt: tok.expiresAt,
-        });
-        await ctx.scheduler.runAfter(0, internal.accounts.subscribeWebhooks, { accountId, igUserId: acc.igUserId, token: tok.accessToken });
-      }
-      return back("/accounts?connected=1");
+    const tok = await exchangeUnifiedCode({ code, appId, appSecret, redirectUri, graphVersion: process.env.META_GRAPH_VERSION });
+    const accounts = await fetchAssignedInstagramAccounts(tok.accessToken, process.env.META_GRAPH_VERSION);
+    if (accounts.length === 0) return back("/accounts?error=noaccount");
+    const tokenEnc = await encryptSecret(tok.accessToken, encKey);
+    for (const acc of accounts) {
+      const accountId = await ctx.runMutation(internal.accounts.upsertAccount, {
+        orgId: who.orgId, userId: who.userId, igUserId: acc.igUserId, username: acc.username,
+        tokenEnc, tokenExpiresAt: tok.expiresAt,
+      });
+      await ctx.scheduler.runAfter(0, internal.accounts.subscribeWebhooks, { accountId, igUserId: acc.igUserId, token: tok.accessToken });
     }
-    const short = await exchangeCode({ code, appId, appSecret, redirectUri });
-    const long = await exchangeLongLivedToken(short.accessToken, appSecret);
-    const profile = await fetchOwnProfile(long.accessToken, process.env.META_GRAPH_VERSION);
-    const igUserId = profile.igUserId || short.igUserId;
-    const accountId = await ctx.runMutation(internal.accounts.upsertAccount, {
-      orgId: who.orgId, userId: who.userId, igUserId, username: profile.username,
-      name: profile.name, profilePictureUrl: profile.profilePictureUrl,
-      tokenEnc: await encryptSecret(long.accessToken, encKey), tokenExpiresAt: long.expiresAt,
-    });
-    await ctx.scheduler.runAfter(0, internal.accounts.subscribeWebhooks, { accountId, igUserId, token: long.accessToken });
     return back("/accounts?connected=1");
   } catch (e) {
     const taken = e instanceof Error && e.message.includes("another workspace");

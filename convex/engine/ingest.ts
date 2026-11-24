@@ -64,6 +64,7 @@ export const ingestEvents = internalMutation({
           igAccountId: account._id,
           igsid: event.senderId,
           username: event.type === "comment" ? event.username : undefined,
+          name: event.type === "message" ? event.senderName : undefined,
           tags: [],
           fields: {},
           lastInboundAt: isDm ? event.timestamp : undefined,
@@ -72,7 +73,10 @@ export const ingestEvents = internalMutation({
         contact = (await ctx.db.get(id))!;
       } else if (isDm) {
         // The 24h messaging window is driven by DMs only.
-        await ctx.db.patch(contact._id, { lastInboundAt: Math.max(contact.lastInboundAt ?? 0, event.timestamp) });
+        await ctx.db.patch(contact._id, {
+          lastInboundAt: Math.max(contact.lastInboundAt ?? 0, event.timestamp),
+          ...(!contact.name && event.type === "message" && event.senderName ? { name: event.senderName } : {}),
+        });
       }
 
       // Conversation upsert

@@ -1,5 +1,5 @@
 /**
- * Thin Instagram Graph API client ("Instagram API with Instagram Login").
+ * Thin Instagram Graph API client (Meta "Unified login": system-user token, graph.facebook.com).
  *
  * ⚠ UNVERIFIED: endpoint paths and field names were written from secondary sources because the
  * authoring sandbox could not reach developers.facebook.com. Confirm against Meta's docs and a real
@@ -12,7 +12,7 @@ export type IgClientConfig = {
   accessToken: string;
   igUserId: string;
   graphVersion?: string; // default v24.0, override via META_GRAPH_VERSION
-  /** Graph host. Defaults from META_LOGIN_MODE (see igLoginMode). */
+  /** Graph host, defaults to graph.facebook.com. */
   host?: string;
   fetch?: FetchLike;
 };
@@ -35,19 +35,7 @@ export class IgApiError extends Error {
   }
 }
 
-const GRAPH = "https://graph.instagram.com";
 export const FB_GRAPH = "https://graph.facebook.com";
-
-/**
- * Which Meta login setup the app uses:
- *  - "instagram": classic "API setup with Instagram login" (graph.instagram.com, instagram_business_* scopes).
- *  - "unified": newer apps ("Unified login": Facebook Login for Business + system-user token, graph.facebook.com).
- * Selected with the META_LOGIN_MODE env var (default "instagram").
- */
-export function igLoginMode(): "instagram" | "unified" {
-  return process.env.META_LOGIN_MODE === "unified" ? "unified" : "instagram";
-}
-export const defaultGraphHost = () => (igLoginMode() === "unified" ? FB_GRAPH : GRAPH);
 
 export function buildSendBody(
   target: SendTarget,
@@ -87,7 +75,7 @@ export function parseApiError(status: number, json: any): IgApiError {
 
 export function createIgClient(cfg: IgClientConfig) {
   const f: FetchLike = cfg.fetch ?? ((url, init) => fetch(url, init));
-  const base = `${cfg.host ?? defaultGraphHost()}/${cfg.graphVersion ?? "v24.0"}`;
+  const base = `${cfg.host ?? FB_GRAPH}/${cfg.graphVersion ?? "v24.0"}`;
 
   async function call(path: string, init: { method: "GET" | "POST"; body?: unknown; query?: Record<string, string> }) {
     const qs = init.query ? `?${new URLSearchParams(init.query)}` : "";
@@ -132,29 +120,4 @@ export function createIgClient(cfg: IgClientConfig) {
       return call(`/${cfg.igUserId}/subscribed_apps`, { method: "POST", query: { subscribed_fields: fields.join(",") } });
     },
   };
-}
-
-/** Exchange a short-lived token for a ~60-day one. Needs the app secret, so only call server-side. */
-export async function exchangeLongLivedToken(
-  shortToken: string,
-  appSecret: string,
-  fetchFn: FetchLike = (u, i) => fetch(u, i),
-): Promise<{ accessToken: string; expiresAt: number }> {
-  const qs = new URLSearchParams({ grant_type: "ig_exchange_token", client_secret: appSecret, access_token: shortToken });
-  const res = await fetchFn(`${GRAPH}/access_token?${qs}`, { method: "GET" });
-  const json: any = await res.json().catch(() => ({}));
-  if (!res.ok) throw parseApiError(res.status, json);
-  return { accessToken: json.access_token, expiresAt: Date.now() + (json.expires_in ?? 5184000) * 1000 };
-}
-
-/** Refresh a long-lived token (valid after 24h, before expiry). */
-export async function refreshLongLivedToken(
-  token: string,
-  fetchFn: FetchLike = (u, i) => fetch(u, i),
-): Promise<{ accessToken: string; expiresAt: number }> {
-  const qs = new URLSearchParams({ grant_type: "ig_refresh_token", access_token: token });
-  const res = await fetchFn(`${GRAPH}/refresh_access_token?${qs}`, { method: "GET" });
-  const json: any = await res.json().catch(() => ({}));
-  if (!res.ok) throw parseApiError(res.status, json);
-  return { accessToken: json.access_token, expiresAt: Date.now() + (json.expires_in ?? 5184000) * 1000 };
 }

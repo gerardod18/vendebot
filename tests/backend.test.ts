@@ -1,7 +1,6 @@
 import { convexTest } from "convex-test";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, internal } from "../convex/_generated/api";
-import { buildAuthUrl, exchangeCode } from "../convex/instagram/oauth";
 import { parseSignedRequest } from "../convex/instagram/signedRequest";
 import { isSafeWebhookUrl } from "../convex/lib/safeUrl";
 import { parseWebhook } from "../convex/instagram/parse";
@@ -24,18 +23,6 @@ describe("pure helpers", () => {
       expect(isSafeWebhookUrl(u), u).toBe(false);
     }
   });
-  it("auth URL carries client id, scopes, state", () => {
-    const u = new URL(buildAuthUrl({ appId: "123", redirectUri: "https://x.convex.site/meta/oauth/callback", state: "s1" }));
-    expect(u.searchParams.get("client_id")).toBe("123");
-    expect(u.searchParams.get("state")).toBe("s1");
-    expect(u.searchParams.get("scope")).toContain("instagram_business_manage_messages");
-  });
-  it("exchangeCode posts a form and parses the token", async () => {
-    const f = vi.fn(async () => new Response(JSON.stringify({ access_token: "T", user_id: 99 }), { status: 200 }));
-    const r = await exchangeCode({ code: "c", appId: "1", appSecret: "s", redirectUri: "r" }, f as any);
-    expect(r).toEqual({ accessToken: "T", igUserId: "99" });
-    expect(String((f.mock.calls[0] as any)[1].body)).toContain("grant_type=authorization_code");
-  });
   it("signed_request verifies the HMAC", async () => {
     const secret = "shh";
     const payload = btoa(JSON.stringify({ user_id: "42" })).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
@@ -49,13 +36,14 @@ describe("pure helpers", () => {
 });
 
 describe("accounts + OAuth state", () => {
-  beforeEach(() => { process.env.META_APP_ID = "123"; process.env.CONVEX_SITE_URL = "https://x.convex.site"; });
-  afterEach(() => { delete process.env.META_APP_ID; });
+  beforeEach(() => { process.env.META_APP_ID = "123"; process.env.META_CONFIG_ID = "cfg1"; process.env.CONVEX_SITE_URL = "https://x.convex.site"; });
+  afterEach(() => { delete process.env.META_APP_ID; delete process.env.META_CONFIG_ID; });
 
   it("startConnect needs admin and creates a one-time state", async () => {
     const t = convexTest(schema, modules);
     const orgId = await org(t);
     const { url } = await as(t, "u1").mutation(api.accounts.startConnect, { orgId });
+    expect(new URL(url).searchParams.get("config_id")).toBe("cfg1");
     const state = new URL(url).searchParams.get("state")!;
     expect(await t.mutation(internal.accounts.consumeState, { state })).toMatchObject({ orgId, userId: "u1" });
     expect(await t.mutation(internal.accounts.consumeState, { state })).toBeNull(); // single use

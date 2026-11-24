@@ -9,7 +9,7 @@ export const loadForProfile = internalQuery({
   handler: async (ctx, { contactId }) => {
     const c = await ctx.db.get(contactId);
     const a = c ? await ctx.db.get(c.igAccountId) : null;
-    if (!c || !a || a.status !== "active") return null;
+    if (!c || !a || a.status !== "active" || a.channel === "whatsapp") return null; // WhatsApp sends the name in the webhook
     return { igsid: c.igsid, igUserId: a.igUserId, tokenEnc: a.tokenEnc };
   },
 });

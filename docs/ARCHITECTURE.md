@@ -153,7 +153,7 @@ See `META_SETUP.md`. Key ones:
 |---|---|
 | `SITE_URL` | Frontend URL (Better Auth trusted origin, OAuth return) |
 | `BETTER_AUTH_SECRET` | Better Auth secret |
-| `META_APP_ID`, `META_APP_SECRET` | Meta app (Instagram API with Instagram Login) |
+| `META_APP_ID`, `META_APP_SECRET`, `META_CONFIG_ID` | Meta app (Unified login; config id of the login configuration) |
 | `META_WEBHOOK_VERIFY_TOKEN` | Random string used in the webhook GET verification |
 | `META_GRAPH_VERSION` | e.g. `v24.0` (check the current version in Meta's docs) |
 | `TOKEN_ENCRYPTION_KEY` | 32-byte base64 key for AES-GCM |

@@ -28,7 +28,7 @@ describe("createIgClient", () => {
     const r = await c.sendMessage({ recipientId: "u1" }, { text: "hola" });
     expect(r).toEqual({ messageId: "mid1", recipientId: "u1" });
     const [url, init] = f.mock.calls[0];
-    expect(url).toBe("https://graph.instagram.com/v24.0/me/messages");
+    expect(url).toBe("https://graph.facebook.com/v24.0/me/messages");
     expect(url).not.toContain("SECRET");
     expect((init.headers as any).Authorization).toBe("Bearer SECRET");
   });

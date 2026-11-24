@@ -1,5 +1,7 @@
 # Meta / Instagram setup and rules
 
+> **2026-11-24 update:** new Meta apps only offer **Unified login** (Facebook Login for Business: `config_id`, business system-user token, `graph.facebook.com`, permissions `instagram_basic` / `instagram_manage_messages` / `instagram_manage_comments`). The classic Instagram-login flow below (`instagram_business_*` scopes, `graph.instagram.com`) was removed from the code. Set `META_CONFIG_ID`. WhatsApp uses the Cloud API with its own test number. Step-by-step demo setup: `~/claude-plans/vendebot/demo-plan.md`.
+
 > Meta changes these screens and limits often. Treat the steps as a guide and confirm against
 > developers.facebook.com (Instagram Platform → "Instagram API with Instagram Login").
 

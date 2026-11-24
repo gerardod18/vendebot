@@ -9,6 +9,7 @@ import { internalAction, internalMutation, internalQuery } from "./_generated/se
 import { recordOutbound } from "./ai/quota";
 import { createIgClient, IgApiError } from "./instagram/client";
 import { checkWindow } from "./instagram/window";
+import { createWhatsAppClient } from "./whatsapp/client";
 import { decryptSecret } from "./lib/crypto";
 import { isSafeWebhookUrl } from "./lib/safeUrl";
 
@@ -30,6 +31,7 @@ export const loadTarget = internalQuery({
       igsid: contact.igsid,
       lastInboundAt: contact.lastInboundAt,
       igUserId: account.igUserId,
+      channel: account.channel ?? ("instagram" as const),
       tokenEnc: account.tokenEnc,
       accountId: account._id,
       accountStatus: account.status,
@@ -95,7 +97,9 @@ export const deliver = internalAction({
     };
     if (t.accountStatus !== "active") return fail("account_not_active");
 
-    const decision = checkWindow(t.lastInboundAt, Date.now(), { humanAgent: a.humanAgent, privateReply: Boolean(a.replyToCommentId) });
+    const isWa = t.channel === "whatsapp";
+    // WhatsApp has a 24h window with no HUMAN_AGENT extension and no comment private replies.
+    const decision = checkWindow(t.lastInboundAt, Date.now(), { humanAgent: isWa ? false : a.humanAgent, privateReply: !isWa && Boolean(a.replyToCommentId) });
     if (decision === "closed") {
       await ctx.runMutation(internal.outbound.recordMessage, {
         conversationId: a.conversationId, text: a.items[0].text, source: a.source, status: "failed", error: "window_closed",
@@ -105,17 +109,18 @@ export const deliver = internalAction({
 
     const encKey = process.env.TOKEN_ENCRYPTION_KEY;
     if (!encKey) return fail("server_not_configured");
-    const client = createIgClient({
-      accessToken: await decryptSecret(t.tokenEnc, encKey),
-      igUserId: t.igUserId,
-      graphVersion: process.env.META_GRAPH_VERSION,
-    });
+    const token = await decryptSecret(t.tokenEnc, encKey);
+    const graphVersion = process.env.META_GRAPH_VERSION;
+    const ig = createIgClient({ accessToken: token, igUserId: t.igUserId, graphVersion });
+    const wa = createWhatsAppClient({ accessToken: token, phoneNumberId: t.igUserId, graphVersion });
 
     for (let i = 0; i < a.items.length; i++) {
       const it = a.items[i];
       try {
         const target = i === 0 && a.replyToCommentId ? { commentId: a.replyToCommentId } : { recipientId: t.igsid };
-        const r = await client.sendMessage(target, it, { humanAgentTag: decision === "human_agent_tag" });
+        const r = isWa
+          ? await wa.sendMessage(t.igsid, it)
+          : await ig.sendMessage(target, it, { humanAgentTag: decision === "human_agent_tag" });
         await ctx.runMutation(internal.outbound.recordMessage, {
           conversationId: a.conversationId, text: it.text, source: a.source, status: "sent", mid: r.messageId,
         });
@@ -165,7 +170,7 @@ export const publicReply = internalAction({
   handler: async (ctx, a) => {
     const t = await ctx.runQuery(internal.outbound.loadTarget, { conversationId: a.conversationId });
     const encKey = process.env.TOKEN_ENCRYPTION_KEY;
-    if (!t || t.accountStatus !== "active" || !encKey) return;
+    if (!t || t.accountStatus !== "active" || t.channel === "whatsapp" || !encKey) return;
     const client = createIgClient({
       accessToken: await decryptSecret(t.tokenEnc, encKey), igUserId: t.igUserId, graphVersion: process.env.META_GRAPH_VERSION,
     });
