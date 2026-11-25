@@ -21,6 +21,8 @@ export const TYPE_TO_KEY: Record<string, Key> = { welcome: "welcome", keyword: "
 type Account = { accountId: Id<"igAccounts">; username: string; channel: Channel; status: string };
 type Existing = {
   triggerId: Id<"triggers">; name: string; templateKey: string | null; templateConfig: any; type: string; config: any; igAccountId: Id<"igAccounts">;
+  /** Active version the form was loaded from (sent back so a stale edit is refused). */
+  version?: number;
 };
 
 const split = (s: string) => s.split(",").map((x) => x.trim()).filter(Boolean);
@@ -42,7 +44,10 @@ export function AutomationForm({ accounts, existing, onDone }: { accounts: Accou
   const active = accounts.filter((a) => a.status === "active");
 
   const [key, setKey] = useState<Key>(existing ? TYPE_TO_KEY[existing.type] : "welcome");
-  const [account, setAccount] = useState<string>(existing?.igAccountId ?? active[0]?.accountId ?? "");
+  const [picked, setPicked] = useState<string>(existing?.igAccountId ?? "");
+  // Always an account of the current workspace: a stale pick falls back to the first active one.
+  const account = existing?.igAccountId ?? (active.find((a) => a.accountId === picked) ?? active[0])?.accountId ?? "";
+  const [baseVersion] = useState(existing?.version); // captured at mount: later remote changes must not be overwritten silently
   const [name, setName] = useState(existing?.name ?? "");
   const [keywords, setKeywords] = useState((existing?.config?.keywords ?? []).join(", "));
   const [match, setMatch] = useState<"contains" | "exact">(existing?.config?.match ?? "contains");
@@ -87,7 +92,7 @@ export function AutomationForm({ accounts, existing, onDone }: { accounts: Accou
         : { key, text, ...(handoff ? { handoffAfter: true } : {}) };
     if (existing) {
       const ok = asForm
-        ? await runOk(() => update({ orgId: org.orgId, triggerId: existing.triggerId, name: finalName, template, ...trig }))
+        ? await runOk(() => update({ orgId: org.orgId, triggerId: existing.triggerId, name: finalName, template, ...trig, expectedVersion: baseVersion }))
         : await runOk(() => updateTrigger({ orgId: org.orgId, triggerId: existing.triggerId, name: finalName, ...trig }));
       if (ok) onDone(existing.triggerId);
     } else {
@@ -121,7 +126,7 @@ export function AutomationForm({ accounts, existing, onDone }: { accounts: Accou
           <legend className="text-sm font-medium">Cuenta</legend>
           {active.map((a) => (
             <label key={a.accountId} className="flex cursor-pointer items-center gap-3 rounded-md border border-line p-2.5">
-              <input type="radio" name="account" checked={account === a.accountId} onChange={() => setAccount(a.accountId)} />
+              <input type="radio" name="account" checked={account === a.accountId} onChange={() => setPicked(a.accountId)} />
               <ChannelBadge channel={a.channel} /><span className="text-sm">{a.channel === "whatsapp" ? a.username : `@${a.username}`}</span>
             </label>
           ))}

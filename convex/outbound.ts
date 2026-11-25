@@ -19,15 +19,20 @@ const item = v.object({
 });
 
 export const loadTarget = internalQuery({
-  args: { conversationId: v.id("conversations") },
-  handler: async (ctx, { conversationId }) => {
+  args: { conversationId: v.id("conversations"), runId: v.optional(v.id("flowRuns")) },
+  handler: async (ctx, { conversationId, runId }) => {
     const conversation = await ctx.db.get(conversationId);
     if (!conversation) return null;
     const contact = await ctx.db.get(conversation.contactId);
     const account = await ctx.db.get(conversation.igAccountId);
     if (!contact || !account) return null;
+    // Never send for a conversation whose contact or account belongs to another workspace.
+    if (contact.orgId !== conversation.orgId || account.orgId !== conversation.orgId || conversation.igAccountId !== account._id) return null;
+    const run = runId ? await ctx.db.get(runId) : null;
     return {
       orgId: conversation.orgId,
+      mode: conversation.mode,
+      runStatus: run && run.orgId === conversation.orgId ? run.status : undefined,
       igsid: contact.igsid,
       lastInboundAt: contact.lastInboundAt,
       igUserId: account.igUserId,
@@ -73,7 +78,8 @@ export const failRun = internalMutation({
 export const markAccountExpired = internalMutation({
   args: { accountId: v.id("igAccounts") },
   handler: async (ctx, { accountId }) => {
-    await ctx.db.patch(accountId, { status: "expired" });
+    const a = await ctx.db.get(accountId);
+    if (a?.status === "active") await ctx.db.patch(accountId, { status: "expired" }); // never overwrite `revoked`
   },
 });
 
@@ -88,10 +94,17 @@ export const deliver = internalAction({
     humanAgent: v.optional(v.boolean()),
     runId: v.optional(v.id("flowRuns")),
     attempt: v.optional(v.number()),
+    /** The batch carries a flow's handoff message: it must still go out even though the conversation is already `human`. */
+    handoff: v.optional(v.boolean()),
   },
   handler: async (ctx, a) => {
-    const t = await ctx.runQuery(internal.outbound.loadTarget, { conversationId: a.conversationId });
+    const t = await ctx.runQuery(internal.outbound.loadTarget, { conversationId: a.conversationId, runId: a.runId });
     if (!t || a.items.length === 0) return;
+    // A delayed retry must not outlive a takeover: a person (or a cancelled run) owns the conversation now.
+    // An AI reply whose run was cancelled after it was queued is dropped for the same reason.
+    const cancelled = t.runStatus === "cancelled" && ((a.attempt ?? 0) > 0 || a.source === "ai");
+    const takenOver = (a.attempt ?? 0) > 0 && a.source === "bot" && !a.handoff && t.mode === "human";
+    if (cancelled || takenOver) return;
     const fail = async (error: string) => {
       if (a.runId) await ctx.runMutation(internal.outbound.failRun, { runId: a.runId, error });
     };
@@ -116,14 +129,13 @@ export const deliver = internalAction({
 
     for (let i = 0; i < a.items.length; i++) {
       const it = a.items[i];
+      let sentId: string | undefined;
       try {
         const target = i === 0 && a.replyToCommentId ? { commentId: a.replyToCommentId } : { recipientId: t.igsid };
         const r = isWa
           ? await wa.sendMessage(t.igsid, it)
           : await ig.sendMessage(target, it, { humanAgentTag: decision === "human_agent_tag" });
-        await ctx.runMutation(internal.outbound.recordMessage, {
-          conversationId: a.conversationId, text: it.text, source: a.source, status: "sent", mid: r.messageId,
-        });
+        sentId = r.messageId;
       } catch (e) {
         const attempt = a.attempt ?? 0;
         if (e instanceof IgApiError && e.retryable && attempt + 1 < MAX_ATTEMPTS) {
@@ -140,6 +152,14 @@ export const deliver = internalAction({
           await ctx.runMutation(internal.outbound.markAccountExpired, { accountId: t.accountId });
         }
         return fail(`send_failed: ${msg.slice(0, 200)}`);
+      }
+      // The message is out. Recording it is bookkeeping: a failure here must not mark the send failed or fail the run.
+      try {
+        await ctx.runMutation(internal.outbound.recordMessage, {
+          conversationId: a.conversationId, text: it.text, source: a.source, status: "sent", mid: sentId,
+        });
+      } catch (e) {
+        console.error("outbound: sent but could not record the message", e instanceof Error ? e.message : "unknown error");
       }
     }
   },

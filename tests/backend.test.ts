@@ -55,13 +55,18 @@ describe("accounts + OAuth state", () => {
     const a = await org(t, "u1"), b = await org(t, "u2");
     const args = { userId: "u1", igUserId: "77", username: "x", tokenEnc: "enc", tokenExpiresAt: Date.now() + 1e10 };
     const id = await t.mutation(internal.accounts.upsertAccount, { orgId: a, ...args });
-    await expect(t.mutation(internal.accounts.upsertAccount, { orgId: b, ...args })).rejects.toThrow(/another workspace/);
+    await expect(t.mutation(internal.accounts.upsertAccount, { orgId: b, ...args })).rejects.toThrow(/No pudimos conectar/);
     const list = await as(t, "u1").query(api.accounts.list, { orgId: a });
     expect(list[0]).not.toHaveProperty("tokenEnc");
     await as(t, "u1").mutation(api.accounts.disconnect, { orgId: a, accountId: id });
-    // now free to be connected by someone else
-    await t.mutation(internal.accounts.upsertAccount, { orgId: b, ...args });
-    await expect(as(t, "u1").mutation(api.accounts.disconnect, { orgId: a, accountId: id })).rejects.toThrow(/not found/);
+    // now free to be connected by someone else, which creates a NEW row: the old row stays with its owner
+    const bId = await t.mutation(internal.accounts.upsertAccount, { orgId: b, ...args });
+    expect(bId).not.toBe(id);
+    await t.run(async (ctx) => {
+      expect(await ctx.db.get(id)).toMatchObject({ orgId: a, status: "revoked" });
+      expect(await ctx.db.get(bId)).toMatchObject({ orgId: b, status: "active" });
+    });
+    await expect(as(t, "u2").mutation(api.accounts.disconnect, { orgId: b, accountId: id })).rejects.toThrow(/not found/);
   });
 });
 
@@ -80,10 +85,10 @@ describe("inbox", () => {
     expect((await as(t, "u1").query(api.inbox.listConversations, { orgId }))[0]).toMatchObject({ contactName: "Ana", unread: 2 });
     await as(t, "u1").mutation(api.inbox.markRead, { orgId, conversationId });
     await as(t, "u1").mutation(api.inbox.takeOver, { orgId, conversationId });
-    expect((await as(t, "u1").query(api.inbox.getThread, { orgId, conversationId })).conversation).toMatchObject({ mode: "human", assignedTo: "u1" });
+    expect((await as(t, "u1").query(api.inbox.getThread, { orgId, conversationId }))!.conversation).toMatchObject({ mode: "human", assignedTo: "u1" });
     await as(t, "u1").mutation(api.inbox.giveBack, { orgId, conversationId });
     // cross-tenant: u2 using its own org id with u1's conversation id
-    await expect(as(t, "u2").query(api.inbox.getThread, { orgId: other, conversationId })).rejects.toThrow(/not found/);
+    await expect(as(t, "u2").query(api.inbox.getThread, { orgId: other, conversationId })).resolves.toBeNull();
     await expect(as(t, "u2").mutation(api.inbox.sendHuman, { orgId: other, conversationId, text: "hi" })).rejects.toThrow(/not found/);
   });
 

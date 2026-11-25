@@ -3,7 +3,7 @@ import {
   type Connection,
 } from "@xyflow/react";
 import { useCallback, useMemo, useState } from "react";
-import type { Graph, GraphNode } from "../../../convex/engine/graph";
+import { channelProblems, type Graph, type GraphNode } from "../../../convex/engine/graph";
 import {
   BLOCKS, NODE_WIDTH, edgeOf, fromFlow, newNode, portsOf, problems, toFlow, type BlockType, type FlowEdge, type FlowNode, type Layout,
 } from "../../lib/flow";
@@ -20,6 +20,8 @@ type Props = {
   editing: boolean;
   saving: boolean;
   error: string | null;
+  /** Channel of the automation's account: the editor flags what that channel cannot send (e.g. >10 options on WhatsApp). */
+  channel?: "instagram" | "whatsapp";
   onSave: (graph: Graph, layout: Layout) => void;
   onCancel: () => void;
 };
@@ -32,7 +34,7 @@ export function FlowEditor(props: Props) {
   );
 }
 
-function Inner({ graph, layout, editing, saving, error, onSave, onCancel }: Props) {
+function Inner({ graph, layout, editing, saving, error, channel = "instagram", onSave, onCancel }: Props) {
   const initial = useMemo(() => toFlow(graph, layout), [graph, layout]);
   const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>(initial.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState<FlowEdge>(initial.edges);
@@ -42,7 +44,7 @@ function Inner({ graph, layout, editing, saving, error, onSave, onCancel }: Prop
   const effectiveStart = nodes.some((n) => n.id === startId) ? startId : nodes[0]?.id ?? "";
   const display = useMemo(() => nodes.map((n) => ({ ...n, data: { ...n.data, isStart: n.id === effectiveStart } })), [nodes, effectiveStart]);
   const built = useMemo(() => fromFlow(display, edges), [display, edges]);
-  const issues = useMemo(() => problems(built.graph), [built.graph]);
+  const issues = useMemo(() => [...problems(built.graph), ...channelProblems(built.graph, channel)], [built.graph, channel]);
   const current = display.find((n) => n.id === selected) ?? null;
 
   const onConnect = useCallback((c: Connection) => {

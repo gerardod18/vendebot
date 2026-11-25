@@ -50,7 +50,8 @@ export const nodeSchema = z.discriminatedUnion("type", [
     exitWhen: z.string().max(500).default(""),
     timeoutMinutes: z.number().int().min(1).max(60 * 24 * 7).default(60),
     useKnowledge: z.boolean().default(true),
-    model: z.string().optional(),
+    // No per-node `model`: the platform (superAdmin) alone decides provider and model. A stray `model` key in
+    // saved or submitted graphs is stripped by this schema, so a workspace can never pick a model on the platform key.
   }),
   z.object({ id, type: z.literal("action"), actions: z.array(actionItemSchema).min(1).max(10) }),
   z.object({ id, type: z.literal("wait"), minutes: z.number().int().min(1).max(60 * 24 * 7) }),
@@ -134,4 +135,16 @@ export function validateGraph(input: unknown): { ok: true; graph: Graph } | { ok
     for (const n of graph.nodes) if (!seen.has(n.id)) errors.push(`node "${n.id}" is unreachable`);
   }
   return errors.length ? { ok: false, errors } : { ok: true, graph };
+}
+
+/** WhatsApp sends 1-3 options as reply buttons and 4-10 as a list; it cannot show more. */
+export const WHATSAPP_MAX_OPTIONS = 10;
+
+/** Problems a channel has with an otherwise valid graph (shared by the server check and the editor). Empty = fits. */
+export function channelProblems(graph: Graph, channel: "instagram" | "whatsapp"): string[] {
+  if (channel !== "whatsapp") return [];
+  return graph.nodes.flatMap((n) =>
+    n.type === "quickReplies" && n.options.length > WHATSAPP_MAX_OPTIONS
+      ? [`WhatsApp admite máximo ${WHATSAPP_MAX_OPTIONS} opciones por mensaje; el bloque "${n.id}" tiene ${n.options.length}`]
+      : []);
 }

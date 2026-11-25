@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { internalMutation } from "../_generated/server";
 import type { InboundEvent } from "../instagram/parse";
+import { findActiveAccount } from "../lib/accounts";
 
 /**
  * Stores normalized inbound events. Idempotent: an event whose dedupeKey was already stored is skipped,
@@ -23,11 +24,10 @@ export const ingestEvents = internalMutation({
     let unknownAccount = 0;
 
     for (const event of events) {
-      const account = await ctx.db
-        .query("igAccounts")
-        .withIndex("by_igUserId", (q) => q.eq("igUserId", event.igUserId))
-        .unique();
-      if (!account || account.status === "revoked") {
+      // Only a live account of the SAME channel as the payload may receive it (an Instagram id and a WhatsApp
+      // phone number id can collide, and a revoked row of a former owner must stay inert).
+      const account = await findActiveAccount(ctx, event.channel ?? "instagram", event.igUserId);
+      if (!account) {
         unknownAccount++;
         continue;
       }

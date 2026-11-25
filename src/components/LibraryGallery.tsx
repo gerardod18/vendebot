@@ -22,8 +22,10 @@ export function LibraryGallery({ accounts, onDone }: { accounts: Account[]; onDo
   const create = useMutation(api.automations.createFromLibrary);
   const { run, busy, error } = useRun();
   const active = accounts.filter((a) => a.status === "active");
-  const [account, setAccount] = useState<string>(active[0]?.accountId ?? "");
-  const current = active.find((a) => a.accountId === account);
+  const [picked, setPicked] = useState<string>("");
+  // Always an account of THIS workspace's current list: a stale pick (after a workspace switch) falls back to the first one.
+  const current = active.find((a) => a.accountId === picked) ?? active[0];
+  const account = current?.accountId ?? "";
 
   if (active.length === 0) return <p className="text-sm text-ink-soft">Primero conecta una cuenta de Instagram o WhatsApp en la sección Cuentas.</p>;
 
@@ -38,7 +40,7 @@ export function LibraryGallery({ accounts, onDone }: { accounts: Account[]; onDo
           <div className="flex flex-wrap gap-2">
             {active.map((a) => (
               <label key={a.accountId} className={`flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 ${account === a.accountId ? "border-brand bg-brand-wash" : "border-line"}`}>
-                <input type="radio" name="lib-account" checked={account === a.accountId} onChange={() => setAccount(a.accountId)} />
+                <input type="radio" name="lib-account" checked={account === a.accountId} onChange={() => setPicked(a.accountId)} />
                 <ChannelBadge channel={a.channel} /><span className="text-sm">{a.channel === "whatsapp" ? a.username : `@${a.username}`}</span>
               </label>
             ))}

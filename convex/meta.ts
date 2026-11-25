@@ -79,12 +79,12 @@ export const oauthCallback = httpAction(async (ctx, request) => {
         orgId: who.orgId, userId: who.userId, igUserId: acc.igUserId, username: acc.username,
         tokenEnc, tokenExpiresAt: tok.expiresAt,
       });
-      await ctx.scheduler.runAfter(0, internal.accounts.subscribeWebhooks, { accountId, igUserId: acc.igUserId, token: tok.accessToken });
+      await ctx.scheduler.runAfter(0, internal.accounts.subscribeWebhooks, { accountId });
     }
     return back("/accounts?connected=1");
-  } catch (e) {
-    const taken = e instanceof Error && e.message.includes("another workspace");
-    return back(`/accounts?error=${taken ? "taken" : "failed"}`);
+  } catch {
+    // One generic outcome: a conflict with another workspace must not be distinguishable from any other failure.
+    return back("/accounts?error=failed");
   }
 });
 

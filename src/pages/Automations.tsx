@@ -8,7 +8,13 @@ import { LibraryGallery } from "../components/LibraryGallery";
 import { Btn, ChannelBadge, ErrorText, Notice, PageTitle, Toggle, useRun, type Channel } from "../components/ui";
 import { useOrg } from "../lib/org";
 
+/** Keyed by workspace: switching workspace drops the selection and every form, so no stale account or trigger id is ever sent. */
 export function Automations() {
+  const { org } = useOrg();
+  return <AutomationsInner key={org.orgId} />;
+}
+
+function AutomationsInner() {
   const { org, isAdmin } = useOrg();
   const list = useQuery(api.automations.list, { orgId: org.orgId });
   const accountRows = useQuery(api.accounts.list, { orgId: org.orgId });
@@ -72,8 +78,8 @@ export function Automations() {
                 ))}
               </div>
               {newTab === "library"
-                ? <LibraryGallery accounts={accounts} onDone={(id) => setSelected(id)} />
-                : <AutomationForm accounts={accounts} onDone={(id) => setSelected(id ?? null)} />}
+                ? <LibraryGallery key={org.orgId} accounts={accounts} onDone={(id) => setSelected(id)} />
+                : <AutomationForm key={org.orgId} accounts={accounts} onDone={(id) => setSelected(id ?? null)} />}
             </div>
           )}
           {selected && selected !== "new" && <Detail key={selected} triggerId={selected} accounts={accounts} onGone={() => setSelected(null)} />}
@@ -94,6 +100,8 @@ function Detail({ triggerId, accounts, onGone }: { triggerId: Id<"triggers">; ac
   const [tab, setTab] = useState<"flow" | "settings">("flow");
   const [editing, setEditing] = useState(false);
   const [saved, setSaved] = useState(false);
+  /** Version the open editor started from: a save on top of any other version is refused by the server. */
+  const [baseVersion, setBaseVersion] = useState<number | null>(null);
   const { run, runOk, busy, error } = useRun();
 
   if (a === undefined) return <p className="text-sm text-ink-soft">Cargando…</p>;
@@ -127,12 +135,12 @@ function Detail({ triggerId, accounts, onGone }: { triggerId: Id<"triggers">; ac
 
       {tab === "flow" && (
         <>
-          {isAdmin && !editing && a.graph && <Btn onClick={() => setEditing(true)}>Editar flujo</Btn>}
+          {isAdmin && !editing && a.graph && <Btn onClick={() => { setBaseVersion(a.version); setEditing(true); }}>Editar flujo</Btn>}
           {a.graph ? (
-            <FlowEditor key={`${a.version}:${editing}`} graph={a.graph} layout={a.layout} editing={editing && isAdmin} saving={busy} error={error}
+            <FlowEditor key={`${a.version}:${editing}`} graph={a.graph} layout={a.layout} editing={editing && isAdmin} saving={busy} error={error} channel={acc?.channel}
               onCancel={() => setEditing(false)}
               onSave={async (graph, layout) => {
-                const r = await run(() => saveGraph({ orgId: org.orgId, triggerId, graph, layout }));
+                const r = await run(() => saveGraph({ orgId: org.orgId, triggerId, graph, layout, expectedVersion: baseVersion ?? a.version }));
                 if (r) { setEditing(false); setSaved(true); }
               }} />
           ) : <p className="text-sm text-ink-soft">Esta automatización todavía no tiene un flujo.</p>}
@@ -141,7 +149,7 @@ function Detail({ triggerId, accounts, onGone }: { triggerId: Id<"triggers">; ac
 
       {tab === "settings" && (
         <div className="rounded-lg border border-line bg-surface p-5">
-          <AutomationForm accounts={accounts} existing={{ ...a, templateKey: a.templateKey }} onDone={() => setSaved(true)} />
+          <AutomationForm key={a.version} accounts={accounts} existing={{ ...a, templateKey: a.templateKey }} onDone={() => setSaved(true)} />
         </div>
       )}
     </div>

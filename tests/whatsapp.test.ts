@@ -21,7 +21,7 @@ const text = (id: string, body: string) => ({ from: "5215512345678", id, timesta
 describe("parseWhatsApp", () => {
   it("normalizes text messages with sender name and ms timestamp", () => {
     expect(parseWhatsApp(payload([text("wamid.1", "precio")]))).toEqual([
-      { type: "message", dedupeKey: "wamid.1", igUserId: PNID, senderId: "5215512345678", timestamp: 1700000000000, senderName: "Ana", text: "precio" },
+      { type: "message", channel: "whatsapp", dedupeKey: "wamid.1", igUserId: PNID, senderId: "5215512345678", timestamp: 1700000000000, senderName: "Ana", text: "precio" },
     ]);
   });
   it("maps button and list replies to quick reply payloads", () => {
@@ -101,9 +101,9 @@ describe("whatsapp end to end", () => {
     const creds = { orgId, phoneNumberId: PNID, wabaId: "123456789012", accessToken: "EAAG".padEnd(40, "x") };
 
     // agents cannot connect channels; owners can
-    await expect(t.withIdentity({ subject: "u2" }).mutation(api.accounts.connectWhatsApp, creds)).rejects.toThrow();
-    await expect(owner.mutation(api.accounts.connectWhatsApp, { ...creds, phoneNumberId: "abc" })).rejects.toThrow(/numeric/);
-    const { accountId } = await owner.mutation(api.accounts.connectWhatsApp, creds);
+    await expect(t.withIdentity({ subject: "u2" }).action(api.accounts.connectWhatsApp, creds)).rejects.toThrow();
+    await expect(owner.action(api.accounts.connectWhatsApp, { ...creds, phoneNumberId: "abc" })).rejects.toThrow(/numeric/);
+    const { accountId } = await owner.action(api.accounts.connectWhatsApp, creds);
     await settle(t);
     const acc = await t.run((ctx) => ctx.db.get(accountId));
     expect(acc).toMatchObject({ channel: "whatsapp", username: "+1 555 000 1111", webhookSubscribed: true, status: "active" });

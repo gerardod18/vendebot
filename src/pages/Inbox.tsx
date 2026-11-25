@@ -5,7 +5,13 @@ import type { Id } from "../../convex/_generated/dataModel";
 import { Btn, Card, ErrorText, fmtTime, inputCls, useRun } from "../components/ui";
 import { useOrg } from "../lib/org";
 
+/** Keyed by workspace: the selected conversation never survives a workspace switch. */
 export function Inbox() {
+  const { org } = useOrg();
+  return <InboxInner key={org.orgId} />;
+}
+
+function InboxInner() {
   const { org } = useOrg();
   const list = useQuery(api.inbox.listConversations, { orgId: org.orgId });
   const [sel, setSel] = useState<Id<"conversations"> | null>(null);
@@ -29,6 +35,10 @@ export function Inbox() {
   );
 }
 
+/** WhatsApp only allows replies for 24h; Instagram extends it to 7 days for people (HUMAN_AGENT). */
+const closedHint = (channel: "instagram" | "whatsapp") =>
+  channel === "whatsapp" ? "Pasaron más de 24 horas: en WhatsApp ya no puedes responder" : "Pasaron más de 7 días: ya no puedes responder";
+
 function Thread({ conversationId }: { conversationId: Id<"conversations"> }) {
   const { org } = useOrg();
   const data = useQuery(api.inbox.getThread, { orgId: org.orgId, conversationId });
@@ -44,7 +54,8 @@ function Thread({ conversationId }: { conversationId: Id<"conversations"> }) {
   useEffect(() => { void markRead({ orgId: org.orgId, conversationId }).catch(() => {}); }, [count, conversationId, markRead, org.orgId]);
   useEffect(() => { end.current?.scrollIntoView({ block: "end" }); }, [count]);
 
-  if (!data) return <Card>Cargando…</Card>;
+  if (data === undefined) return <Card>Cargando…</Card>;
+  if (data === null) return <Card><p className="text-sm text-ink-soft">Esta conversación ya no está disponible en este espacio de trabajo.</p></Card>;
   const human = data.conversation.mode === "human";
 
   async function submit(e: FormEvent) {
@@ -76,7 +87,7 @@ function Thread({ conversationId }: { conversationId: Id<"conversations"> }) {
       </div>
       <form onSubmit={submit} className="mt-2 flex gap-2">
         <input className={inputCls} value={text} onChange={(e) => setText(e.target.value)} disabled={!data.canReply}
-          placeholder={data.canReply ? "Escribe una respuesta (el bot se pausa)" : "Pasaron más de 7 días: ya no puedes responder"} maxLength={1000} />
+          placeholder={data.canReply ? "Escribe una respuesta (el bot se pausa)" : closedHint(data.channel)} maxLength={1000} />
         <Btn disabled={busy || !data.canReply || !text.trim()}>Enviar</Btn>
       </form>
       <ErrorText error={error} />

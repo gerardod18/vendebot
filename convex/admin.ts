@@ -6,13 +6,12 @@ import { orgAdminQuery } from "./lib/tenancy";
 export const failedRuns = orgAdminQuery({
   args: {},
   handler: async (ctx) => {
-    const runs = await ctx.db.query("flowRuns").withIndex("by_org", (q) => q.eq("orgId", ctx.orgId)).order("desc").take(300);
+    // (orgId, status) is in the index range: the newest 50 failed runs of THIS workspace, whatever other tenants do.
+    const runs = await ctx.db.query("flowRuns").withIndex("by_org_status", (q) => q.eq("orgId", ctx.orgId).eq("status", "failed")).order("desc").take(50);
     const out = [];
     for (const r of runs) {
-      if (r.status !== "failed") continue;
       const contact = await ctx.db.get(r.contactId);
       out.push({ runId: r._id, error: r.error ?? "unknown", at: r.endedAt ?? r._creationTime, contact: contact?.username ?? contact?.name ?? contact?.igsid });
-      if (out.length >= 50) break;
     }
     return out;
   },
@@ -21,8 +20,9 @@ export const failedRuns = orgAdminQuery({
 export const failedEvents = orgAdminQuery({
   args: {},
   handler: async (ctx) => {
-    const rows = await ctx.db.query("webhookEvents").withIndex("by_receivedAt").order("desc").take(300);
-    return rows.filter((e) => e.orgId === ctx.orgId && e.error).slice(0, 50).map((e) => ({ type: e.type, error: e.error, at: e.receivedAt }));
+    // Org first, then the limit: other tenants' traffic can never push this workspace's failures out of the window.
+    const rows = await ctx.db.query("webhookEvents").withIndex("by_org_receivedAt", (q) => q.eq("orgId", ctx.orgId)).order("desc").take(300);
+    return rows.filter((e) => e.error).slice(0, 50).map((e) => ({ type: e.type, error: e.error, at: e.receivedAt }));
   },
 });
 

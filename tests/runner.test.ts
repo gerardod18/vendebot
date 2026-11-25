@@ -1,7 +1,7 @@
 import { convexTest } from "convex-test";
 import { MockLanguageModelV4 } from "ai/test";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { internal } from "../convex/_generated/api";
+import { api, internal } from "../convex/_generated/api";
 import { deps } from "../convex/ai/agent";
 import { encryptSecret } from "../convex/lib/crypto";
 import { parseWebhook } from "../convex/instagram/parse";
@@ -44,7 +44,6 @@ async function seed(opts: { template?: any; keywords?: string[]; aiQuota?: numbe
     return { orgId, igAccountId };
   });
   const as = t.withIdentity({ subject: "u1" });
-  const { api } = await import("../convex/_generated/api");
   await as.mutation(api.automations.create, {
     orgId: ids.orgId, igAccountId: ids.igAccountId, name: "auto",
     template: opts.template ?? { key: "keywordReply", text: "Hola {{first_name}}, el precio es $10" },
@@ -134,9 +133,9 @@ describe("runner: quick replies wait for the next message", () => {
 
 describe("AI agent turn", () => {
   const aiTemplate = { key: "defaultReply", fallbackText: "Te respondemos pronto", ai: { instructions: "Sell shoes", exitWhen: "customer gives phone" } };
-  const modelThatSays = (text: string, tool?: { name: string; input: any }) =>
+  const modelThatSays = (text: string, tool?: { name: string; input: any }, hold?: { started: () => void; gate: Promise<void> }) =>
     new MockLanguageModelV4({
-      doGenerate: async () => ({
+      doGenerate: async () => (hold?.started(), await hold?.gate, {
         content: [
           ...(tool ? [{ type: "tool-call" as const, toolCallId: "c1", toolName: tool.name, input: JSON.stringify(tool.input) }] : []),
           ...(text ? [{ type: "text" as const, text }] : []),
@@ -204,6 +203,84 @@ describe("AI agent turn", () => {
     await t.run(async (ctx) => {
       expect((await ctx.db.query("conversations").collect())[0].mode).toBe("human");
       expect((await ctx.db.query("flowRuns").collect())[0]).toMatchObject({ status: "failed", error: "ai_error" });
+      // tenants get a generic note; the raw provider error is only in the superAdmin audit log
+      const notes = await ctx.db.query("notes").collect();
+      expect(notes.map((n) => n.text)).toEqual(["El asistente no pudo responder; una persona tomará la conversación."]);
+      expect(JSON.stringify(notes)).not.toContain("No API key");
+      const audit = (await ctx.db.query("adminAudit").collect()).filter((a) => a.action === "ai.error");
+      expect(audit).toHaveLength(1);
+      expect(audit[0]).toMatchObject({ userId: "system", detail: "No API key" });
     });
+  });
+
+  /** Starts an AI run (first DM) without running the scheduled turn, then runs one turn by hand so a test can interleave a takeover. */
+  async function startAiRun(opts: Parameters<typeof seed>[0] = { template: aiTemplate, keywords: [] }) {
+    const ctx = await seed(opts);
+    const res = await ctx.t.mutation(internal.engine.ingest.ingestEvents, { events: dm("m1", "hola") });
+    const a = res.accepted[0];
+    await ctx.t.mutation(internal.engine.runner.processInbound, {
+      event: a.event, conversationId: a.conversationId as any, contactId: a.contactId as any, igAccountId: a.igAccountId as any, isFirstContact: a.isFirstContact,
+    });
+    const run = await ctx.t.run(async (c) => (await c.db.query("flowRuns").collect())[0]);
+    expect(run).toMatchObject({ status: "waiting", waitingFor: "ai" });
+    return { ...ctx, runId: run._id, conversationId: a.conversationId as any };
+  }
+  const gateOf = () => {
+    let release!: () => void, started!: () => void;
+    return { gate: new Promise<void>((r) => { release = r; }), started: new Promise<void>((r) => { started = r; }), release, markStarted: () => started() };
+  };
+
+  it("a takeover during the LLM call means no AI text is sent and the run stays cancelled", async () => {
+    const { t, as, orgId, runId, conversationId } = await startAiRun();
+    const g = gateOf();
+    deps.getModel = async () => modelThatSays("respuesta tardía", undefined, { started: g.markStarted, gate: g.gate }) as any;
+    const turn = t.action(internal.ai.agent.reply, { runId });
+    await g.started;
+    await as.mutation(api.inbox.takeOver, { orgId, conversationId });
+    g.release();
+    await turn;
+    await settle(t);
+    expect(sent).toHaveLength(0);
+    await t.run(async (ctx) => {
+      expect((await ctx.db.get(runId))).toMatchObject({ status: "cancelled" });
+      expect((await ctx.db.query("messages").collect()).filter((m) => m.direction === "out")).toHaveLength(0);
+      expect((await ctx.db.get(conversationId) as any)).toMatchObject({ mode: "human", assignedTo: "u1" });
+    });
+  });
+
+  it("an AI error after a takeover does not overwrite the cancelled run, add notes or alert the audit log", async () => {
+    const { t, as, orgId, runId, conversationId } = await startAiRun();
+    const g = gateOf();
+    deps.getModel = async () => { g.markStarted(); await g.gate; throw new Error("provider exploded"); };
+    const turn = t.action(internal.ai.agent.reply, { runId });
+    await g.started;
+    await as.mutation(api.inbox.takeOver, { orgId, conversationId });
+    g.release();
+    await turn;
+    await t.run(async (ctx) => {
+      expect(await ctx.db.get(runId)).toMatchObject({ status: "cancelled" });
+      expect(await ctx.db.query("notes").collect()).toHaveLength(0);
+      expect(await ctx.db.query("adminAudit").collect()).toHaveLength(0);
+    });
+  });
+
+  it("A4: a per-node model is stripped on save and ignored at runtime: only the platform model is used", async () => {
+    const { t, as, orgId } = await seed({ template: aiTemplate, keywords: [] });
+    const [{ triggerId }] = await as.query(api.automations.list, { orgId });
+    const graph = (await as.query(api.automations.get, { orgId, triggerId }))!.graph as any;
+    const evil = { ...graph, nodes: graph.nodes.map((n: any) => (n.type === "aiAgent" ? { ...n, model: "claude-opus-9-expensive" } : n)) };
+    await as.mutation(api.automations.saveGraph, { orgId, triggerId, graph: evil });
+    const saved = (await as.query(api.automations.get, { orgId, triggerId }))!.graph;
+    expect(JSON.stringify(saved)).not.toContain("claude-opus-9-expensive");
+    // graphs stored before the fix may still carry a model: it must not reach the provider either
+    await t.run(async (ctx) => {
+      const v = (await ctx.db.query("flowVersions").collect()).at(-1)!;
+      await ctx.db.patch(v._id, { graph: evil });
+    });
+    let seen: any;
+    deps.getModel = async (settings: any) => { seen = settings; return modelThatSays("ok") as any; };
+    await receive(t, dm("m1", "hola"));
+    expect(seen.aiModel).toBe("claude-haiku-5-5");
+    expect(sent.map((x) => x.message.text)).toEqual(["ok"]);
   });
 });

@@ -117,7 +117,7 @@ export default defineSchema({
   // ---- Instagram ----
   igAccounts: defineTable({
     orgId: v.id("orgs"),
-    igUserId: v.string(), // IG professional account id (webhook entry.id); for WhatsApp, the phone_number_id
+    igUserId: v.string(), // IG professional account id (webhook entry.id); for WhatsApp, the phone_number_id. Unique per (channel, igUserId) among non-revoked rows; revoked rows stay with the workspace that owned them.
     channel: v.optional(v.union(v.literal("instagram"), v.literal("whatsapp"))), // default instagram
     wabaId: v.optional(v.string()), // WhatsApp Business Account id
     username: v.string(), // IG username; for WhatsApp, the display phone number
@@ -169,6 +169,7 @@ export default defineSchema({
     agentThreadId: v.optional(v.string()),
   })
     .index("by_org_lastMessageAt", ["orgId", "lastMessageAt"])
+    .index("by_org_mode_lastMessageAt", ["orgId", "mode", "lastMessageAt"])
     .index("by_contact", ["contactId"]),
 
   messages: defineTable({
@@ -198,7 +199,8 @@ export default defineSchema({
     error: v.optional(v.string()),
   })
     .index("by_dedupeKey", ["dedupeKey"])
-    .index("by_receivedAt", ["receivedAt"]),
+    .index("by_receivedAt", ["receivedAt"])
+    .index("by_org_receivedAt", ["orgId", "receivedAt"]),
 
   // ---- Automations ----
   flows: defineTable({
@@ -258,8 +260,10 @@ export default defineSchema({
     endedAt: v.optional(v.number()),
   })
     .index("by_conversation_status", ["conversationId", "status"])
+    .index("by_flowVersion_status", ["flowVersionId", "status"])
     .index("by_endedAt", ["endedAt"])
-    .index("by_org", ["orgId"]),
+    .index("by_org", ["orgId"])
+    .index("by_org_status", ["orgId", "status"]),
 
   /** Meta data-deletion callback requests (status page shows `status` by `code`). */
   deletionRequests: defineTable({
