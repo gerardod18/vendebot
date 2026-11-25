@@ -6,7 +6,8 @@
  * - `openrouter`: OpenRouter (https://openrouter.ai). Model ids are `vendor/model`,
  *   e.g. `anthropic/claude-haiku-5-5`, `openai/gpt-5-mini`, `google/gemini-2.5-flash`.
  *
- * API key precedence: the org's own (BYO) key, then the platform env var.
+ * API key precedence: the key a superAdmin stored in the platform settings, then the platform env var.
+ * (The `byo*` field names are historical: workspaces no longer bring their own keys, see D12.)
  */
 
 export const AI_PROVIDERS = ["anthropic", "openrouter"] as const;
@@ -31,7 +32,7 @@ export type AiSettingsLike = {
 export type ResolvedModel = {
   provider: AiProvider;
   modelId: string;
-  /** Encrypted org key if the org brought its own; otherwise read the platform env var. */
+  /** Encrypted key stored in the platform settings, if any; otherwise read the platform env var. */
   byoKeyEnc: string | undefined;
   platformKeyEnv: string;
 };

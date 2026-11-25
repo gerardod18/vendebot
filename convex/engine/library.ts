@@ -99,9 +99,11 @@ export const LIBRARY: LibraryFlow[] = [
       act("lead", [{ kind: "addTag", tag: "lead_calificado" }, { kind: "note", text: "Pedido: {{nombre}}, {{interes}}, teléfono {{telefono}}." }]),
       msg("ok", "Listo, {{nombre}}. Recibimos tu pedido de {{interes}}. Un asesor lo confirma contigo en breve."),
       human("fin"),
+      // A free-text answer that matches none of the options is NOT a product choice: never record it as a fact.
+      human("fuera_menu", "No encontré esa opción. Te paso con una persona del equipo para ayudarte con tu pedido."),
     ], [
       ["intro", "next", "q_nombre"], ["q_nombre", "next", "r_nombre"], ["r_nombre", "next", "q_prod"], ["r_nombre", "timeout", "retomar"],
-      ["q_prod", "grano", "s_grano"], ["q_prod", "molido", "s_molido"], ["q_prod", "suscripcion", "s_susc"], ["q_prod", "next", "s_grano"],
+      ["q_prod", "grano", "s_grano"], ["q_prod", "molido", "s_molido"], ["q_prod", "suscripcion", "s_susc"], ["q_prod", "next", "fuera_menu"],
       ["s_grano", "next", "q_tel"], ["s_molido", "next", "q_tel"], ["s_susc", "next", "q_tel"],
       ["q_tel", "next", "r_tel"], ["r_tel", "next", "lead"], ["r_tel", "timeout", "sin_tel"],
       ["sin_tel", "next", "fin"], ["lead", "next", "ok"], ["ok", "next", "fin"],

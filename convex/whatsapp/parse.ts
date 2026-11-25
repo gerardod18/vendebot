@@ -33,7 +33,7 @@ export function parseWhatsApp(body: unknown): InboundEvent[] {
         const id = str(m?.id), from = str(m?.from);
         if (!id || !from) continue;
         const timestamp = (Number(m.timestamp) || Math.floor(Date.now() / 1000)) * 1000;
-        const base = { type: "message" as const, dedupeKey: id, igUserId: phoneNumberId, senderId: from, timestamp, senderName: names.get(from) };
+        const base = { type: "message" as const, channel: "whatsapp" as const, dedupeKey: id, igUserId: phoneNumberId, senderId: from, timestamp, senderName: names.get(from) };
 
         if (m.type === "text") {
           events.push({ ...base, text: str(m.text?.body) });

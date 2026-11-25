@@ -29,7 +29,16 @@ export async function requireMember(
   orgId: Id<"orgs">,
   minRole: Role = "agent",
 ) {
-  const userId = await requireUserId(ctx);
+  return requireMemberOf(ctx, orgId, await requireUserId(ctx), minRole);
+}
+
+/** Membership check for a user id resolved by the caller (e.g. a public action, which has no `db`, passes it to an internal query). */
+export async function requireMemberOf(
+  ctx: Pick<QueryCtx, "db">,
+  orgId: Id<"orgs">,
+  userId: string,
+  minRole: Role = "agent",
+) {
   const member = await ctx.db
     .query("members")
     .withIndex("by_org_user", (q) => q.eq("orgId", orgId).eq("userId", userId))

@@ -5,8 +5,8 @@ import { decryptSecret } from "../lib/crypto";
 import { resolveModel, type AiSettingsLike } from "./models";
 
 /**
- * Build an AI SDK language model for an org's settings.
- * Key precedence: org BYO key (decrypted here, never logged) then the platform env var.
+ * Build an AI SDK language model from the platform's settings (D12: only superAdmins choose provider, model and keys).
+ * Key precedence: the key a superAdmin stored on the platform (decrypted here, never logged), then the env var.
  * Only call from actions / Node-compatible runtime code, never from queries or mutations.
  */
 export async function getLanguageModel(settings: AiSettingsLike): Promise<LanguageModel> {
@@ -19,7 +19,7 @@ export async function getLanguageModel(settings: AiSettingsLike): Promise<Langua
   } else {
     apiKey = process.env[r.platformKeyEnv];
   }
-  if (!apiKey) throw new Error(`No API key for ${r.provider}: set ${r.platformKeyEnv} or an org key`);
+  if (!apiKey) throw new Error(`No API key for ${r.provider}: set ${r.platformKeyEnv} or store a key in the platform settings`);
 
   if (r.provider === "openrouter") {
     return createOpenRouter({ apiKey })(r.modelId);

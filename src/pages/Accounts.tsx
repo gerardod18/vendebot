@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation, useQuery } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { useSearchParams } from "react-router";
 import { api } from "../../convex/_generated/api";
 import { Btn, Card, ErrorText, Field, PageTitle, fmtTime, inputCls, useRun } from "../components/ui";
@@ -7,7 +7,7 @@ import { useOrg } from "../lib/org";
 
 const MESSAGES: Record<string, string> = {
   denied: "Cancelaste la conexión.", state: "La conexión expiró. Inténtalo de nuevo.", config: "El servidor no está configurado para Instagram.",
-  noaccount: "Meta no devolvió ninguna cuenta profesional de Instagram.", taken: "Esa cuenta ya está conectada a otro espacio de trabajo.", failed: "No pudimos conectar la cuenta. Inténtalo de nuevo.",
+  noaccount: "Meta no devolvió ninguna cuenta profesional de Instagram.", failed: "No pudimos conectar la cuenta. Inténtalo de nuevo.",
 };
 
 export function Accounts() {
@@ -15,12 +15,19 @@ export function Accounts() {
   const accounts = useQuery(api.accounts.list, { orgId: org.orgId });
   const start = useMutation(api.accounts.startConnect);
   const disconnect = useMutation(api.accounts.disconnect);
-  const connectWa = useMutation(api.accounts.connectWhatsApp);
+  const connectWa = useAction(api.accounts.connectWhatsApp); // verifies the token with Meta before saving anything
   const [wa, setWa] = useState({ phoneNumberId: "", wabaId: "", accessToken: "" });
   const [showWa, setShowWa] = useState(false);
   const { run, busy, error } = useRun();
   const [params] = useSearchParams();
   const err = params.get("error");
+
+  /** Reconnecting a WhatsApp number reopens the WhatsApp form (ids prefilled; the token is never shown back). */
+  function reconnectWhatsApp(a: { igUserId: string; wabaId?: string }) {
+    setWa({ phoneNumberId: a.igUserId, wabaId: a.wabaId ?? "", accessToken: "" });
+    setShowWa(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
 
   async function connect() {
     const r = await run(() => start({ orgId: org.orgId }));
@@ -45,7 +52,7 @@ export function Accounts() {
           <Field label="Access token"><input className={inputCls} type="password" autoComplete="off" value={wa.accessToken} onChange={(e) => setWa({ ...wa, accessToken: e.target.value })} /></Field>
           <Btn disabled={busy || !wa.phoneNumberId || !wa.wabaId || !wa.accessToken}
             onClick={async () => { if (await run(() => connectWa({ orgId: org.orgId, ...wa }))) { setWa({ phoneNumberId: "", wabaId: "", accessToken: "" }); setShowWa(false); } }}>
-            Guardar y verificar
+            Verificar y guardar
           </Btn>
         </Card>
       )}
@@ -63,7 +70,7 @@ export function Accounts() {
                 {a.status === "active" && !a.webhookSubscribed && " · ⚠ sin suscripción a mensajes"}
               </p>
             </div>
-            {isAdmin && a.status !== "active" && <Btn variant="ghost" onClick={connect}>Reconectar</Btn>}
+            {isAdmin && a.status !== "active" && <Btn variant="ghost" onClick={() => (a.channel === "whatsapp" ? reconnectWhatsApp(a) : connect())}>Reconectar</Btn>}
             {isAdmin && a.status !== "revoked" && (
               <Btn variant="danger" onClick={() => confirm("¿Desconectar esta cuenta? Se desactivarán sus automatizaciones.") && run(() => disconnect({ orgId: org.orgId, accountId: a.accountId }))}>Desconectar</Btn>
             )}

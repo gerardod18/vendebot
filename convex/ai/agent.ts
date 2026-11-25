@@ -7,7 +7,7 @@ import { generateText, isStepCount, tool } from "ai";
 import { v } from "convex/values";
 import { z } from "zod";
 import { internal } from "../_generated/api";
-import type { Id } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import { internalAction, internalMutation, internalQuery } from "../_generated/server";
 import { graphSchema } from "../engine/graph";
 import { advance } from "../engine/runner";
@@ -21,6 +21,11 @@ import { recordTokens, reserveAiReply } from "./quota";
 export const deps = { getModel: getLanguageModel };
 
 const LOCK_MS = 120_000;
+
+/** True while the run still waits on the AI node of a conversation the bot owns. */
+function isLiveAiTurn(run: Doc<"flowRuns">, conv: Doc<"conversations"> | null): boolean {
+  return run.status === "waiting" && run.waitingFor === "ai" && conv !== null && conv.mode !== "human";
+}
 
 export const beginTurn = internalMutation({
   args: { runId: v.id("flowRuns") },
@@ -59,7 +64,7 @@ export const beginTurn = internalMutation({
       status: "ok" as const,
       lastInboundAt,
       settings: {
-        aiProvider: platform?.aiProvider ?? DEFAULT_PROVIDER, aiModel: node.model ?? platform?.aiModel ?? DEFAULT_MODEL,
+        aiProvider: platform?.aiProvider ?? DEFAULT_PROVIDER, aiModel: platform?.aiModel ?? DEFAULT_MODEL,
         byoAnthropicKeyEnc: platform?.anthropicKeyEnc, byoOpenRouterKeyEnc: platform?.openRouterKeyEnc,
       },
       system: buildSystemPrompt({
@@ -93,17 +98,24 @@ export const finishTurn = internalMutation({
     const run = await ctx.db.get(a.runId);
     if (!run) return;
     const now = Date.now();
+    // The tokens were spent whatever happened meanwhile, so usage is always recorded.
     if (a.usage) await recordTokens(ctx, run.orgId, a.usage, now);
-    await ctx.db.patch(a.runId, { aiLockUntil: undefined });
     const conv = await ctx.db.get(run.conversationId);
     const contact = await ctx.db.get(run.contactId);
+    // The run may have been cancelled (a person took over) or finished while the LLM was thinking. Then this turn is
+    // stale: do not touch the run, the mode, the contact or the scheduler.
+    if (!isLiveAiTurn(run, conv)) return;
+    await ctx.db.patch(a.runId, { aiLockUntil: undefined });
     if (!conv || !contact) return;
 
     const note = (text: string) =>
       ctx.db.insert("notes", { orgId: run.orgId, conversationId: conv._id, contactId: contact._id, text, author: "ai", createdAt: now });
 
     if (a.error) {
-      await note(`AI error, conversation handed to a person: ${a.error.slice(0, 200)}`);
+      // Tenants only get a generic note. The raw provider error can mention keys, models or quota of the platform,
+      // so it goes to the superAdmin audit log only.
+      await note("El asistente no pudo responder; una persona tomará la conversación.");
+      await ctx.db.insert("adminAudit", { userId: "system", action: "ai.error", orgId: run.orgId, detail: a.error.slice(0, 300), at: now });
       await ctx.db.patch(conv._id, { mode: "human" });
       await ctx.db.patch(a.runId, { status: "failed", error: "ai_error", endedAt: now, waitingFor: undefined });
       return;
@@ -202,6 +214,8 @@ export const deliverAi = internalMutation({
   handler: async (ctx, { runId, text }) => {
     const run = await ctx.db.get(runId);
     if (!run) return;
+    // Re-check at the moment of sending: a takeover during the LLM call must mean no AI text goes out.
+    if (!isLiveAiTurn(run, await ctx.db.get(run.conversationId))) return;
     await ctx.scheduler.runAfter(0, internal.outbound.deliver, {
       conversationId: run.conversationId, items: [{ text }], source: "ai", runId,
     });

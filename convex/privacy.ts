@@ -1,6 +1,7 @@
 /** Data deletion (Meta callback + status page) and account revocation. */
 import { v } from "convex/values";
 import { internalMutation, query } from "./_generated/server";
+import { rowsFor } from "./lib/accounts";
 
 /** Delete every contact whose Instagram-scoped id (or username-less commenter id) matches, with all derived data. */
 export const deleteSubjectData = internalMutation({
@@ -34,11 +35,13 @@ export const deleteSubjectData = internalMutation({
 export const revokeAccountByIgUserId = internalMutation({
   args: { igUserId: v.string() },
   handler: async (ctx, { igUserId }) => {
-    const a = await ctx.db.query("igAccounts").withIndex("by_igUserId", (q) => q.eq("igUserId", igUserId)).unique();
-    if (!a) return;
-    await ctx.db.patch(a._id, { status: "revoked", tokenEnc: "", webhookSubscribed: false });
-    for (const t of await ctx.db.query("triggers").withIndex("by_account", (q) => q.eq("igAccountId", a._id)).collect()) {
-      await ctx.db.patch(t._id, { enabled: false });
+    // Meta's callback is about an Instagram user id. Revoke every live Instagram row with that id (normally one).
+    for (const a of await rowsFor(ctx, "instagram", igUserId)) {
+      if (a.status === "revoked") continue;
+      await ctx.db.patch(a._id, { status: "revoked", tokenEnc: "", webhookSubscribed: false });
+      for (const t of await ctx.db.query("triggers").withIndex("by_account", (q) => q.eq("igAccountId", a._id)).collect()) {
+        await ctx.db.patch(t._id, { enabled: false });
+      }
     }
   },
 });

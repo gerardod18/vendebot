@@ -74,7 +74,7 @@ export async function advance(
   const flushSends = async () => {
     if (!sends.length) return;
     await ctx.scheduler.runAfter(0, internal.outbound.deliver, {
-      conversationId: conv._id, items: sends.splice(0), source: "bot", replyToCommentId, runId,
+      conversationId: conv._id, items: sends.splice(0), source: "bot", replyToCommentId, runId, handoff: handedOff || undefined,
     });
     replyToCommentId = undefined; // only the first send may be a private reply
   };
@@ -179,6 +179,14 @@ export const processInbound = internalMutation({
       if (row) await ctx.db.patch(row._id, { processedAt: Date.now(), ...(error ? { error } : {}) });
     };
 
+    // Tenant guard: the conversation, contact, account and every trigger must belong to the same workspace, and the
+    // account must still be live. Never route through rows that drifted apart (e.g. data left behind by a former owner).
+    const [account, contact] = await Promise.all([ctx.db.get(a.igAccountId), ctx.db.get(a.contactId)]);
+    if (
+      !account || account.status !== "active" || account.orgId !== conv.orgId || conv.igAccountId !== account._id ||
+      !contact || contact.orgId !== conv.orgId || conv.contactId !== contact._id
+    ) return markProcessed("tenant_mismatch");
+
     if (a.isFirstContact && event.type !== "comment") {
       await ctx.scheduler.runAfter(0, internal.instagram.profile.fetchProfile, { contactId: a.contactId });
     }
@@ -205,13 +213,14 @@ export const processInbound = internalMutation({
     }
 
     // 2) Otherwise route to a trigger.
-    const rows = await ctx.db.query("triggers").withIndex("by_account", (q) => q.eq("igAccountId", a.igAccountId)).collect();
+    const rows = (await ctx.db.query("triggers").withIndex("by_account", (q) => q.eq("igAccountId", account._id)).collect())
+      .filter((t) => t.orgId === account.orgId);
     const defs: TriggerDef[] = rows.map((t) => ({ id: t._id, type: t.type, enabled: t.enabled, priority: t.priority, config: t.config ?? {} }));
     const hit = routeEvent(toRouteInput(event, a.isFirstContact), defs);
     if (!hit) return markProcessed();
     const trigger = rows.find((t) => t._id === hit.id)!;
     const flow = await ctx.db.get(trigger.flowId);
-    if (!flow || flow.archived || !flow.activeVersionId) return markProcessed("flow_unavailable");
+    if (!flow || flow.orgId !== conv.orgId || flow.archived || !flow.activeVersionId) return markProcessed("flow_unavailable");
     const graph = await loadGraph(ctx, flow.activeVersionId);
     if (!graph) return markProcessed("invalid_graph");
 

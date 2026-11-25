@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useMutation, useQuery } from "convex/react";
+import type { FunctionReturnType } from "convex/server";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { Btn, Card, ErrorText, Field, Notice, PageTitle, fmtTime, inputCls, useRun } from "../components/ui";
@@ -8,6 +9,8 @@ const MODELS = {
   anthropic: ["claude-haiku-5-5", "claude-sonnet-5-5"],
   openrouter: ["anthropic/claude-haiku-5-5", "anthropic/claude-sonnet-5-5", "openai/gpt-5-mini", "google/gemini-2.5-flash", "meta-llama/llama-3.3-70b-instruct"],
 } as const;
+
+type OrgSnapshot = NonNullable<FunctionReturnType<typeof api.platform.openOrg>>;
 
 const usd = (micros: number) => `$${(micros / 1_000_000).toFixed(2)}`;
 
@@ -36,14 +39,27 @@ export function Platform() {
 }
 
 function Console() {
-  const [orgId, setOrgId] = useState<Id<"orgs"> | null>(null);
+  const open = useMutation(api.platform.openOrg);
+  const [detail, setDetail] = useState<OrgSnapshot | null>(null);
+  const [selected, setSelected] = useState<Id<"orgs"> | null>(null);
+  const [gone, setGone] = useState(false);
+  const { run, error } = useRun();
+
+  /** Opening a workspace is a mutation: the audit row is written together with the data it returns. */
+  async function openOrg(orgId: Id<"orgs">) {
+    setSelected(orgId); setGone(false);
+    const d = await run(() => open({ orgId }));
+    if (d) setDetail(d); else { setDetail(null); setGone(d === null); }
+  }
   return (
     <>
       <PageTitle title="Plataforma" />
       <div className="space-y-6">
         <AiConfig />
-        <Orgs selected={orgId} onSelect={setOrgId} />
-        {orgId && <OrgDetail key={orgId} orgId={orgId} onClose={() => setOrgId(null)} />}
+        <Orgs selected={selected} onSelect={openOrg} />
+        <ErrorText error={error} />
+        {gone && <p className="text-sm text-ink-soft">Ese espacio ya no existe.</p>}
+        {detail && <OrgDetail d={detail} onRefresh={() => openOrg(detail.orgId)} onClose={() => { setDetail(null); setSelected(null); }} />}
         <Admins />
         <Audit />
       </div>
@@ -69,7 +85,9 @@ function AiConfig() {
     if (ok) { setAnthropicKey(""); setOpenRouterKey(""); setSaved(true); }
   }
   async function removeKey(which: "anthropic" | "openrouter") {
-    await runOk(() => save({ provider, model, ...(which === "anthropic" ? { anthropicKey: "" } : { openRouterKey: "" }) }));
+    // Removing a key must not also publish whatever is typed in the form: send the provider and model that are SAVED.
+    if (!cfg) return;
+    await runOk(() => save({ provider: cfg.provider, model: cfg.model, ...(which === "anthropic" ? { anthropicKey: "" } : { openRouterKey: "" }) }));
   }
   const keyState = (db: boolean | undefined, env: boolean | undefined) => (db ? "guardada aquí" : env ? "usa la variable de entorno" : "sin clave");
 
@@ -109,12 +127,16 @@ function AiConfig() {
   );
 }
 
+/** "100+" when the server stopped counting at its cap. */
+const count = (n: number, capped: boolean) => (capped ? `${n}+` : String(n));
+
 function Orgs({ selected, onSelect }: { selected: Id<"orgs"> | null; onSelect: (id: Id<"orgs">) => void }) {
-  const rows = useQuery(api.platform.overview);
-  const record = useMutation(api.platform.recordView);
+  const data = useQuery(api.platform.overview);
+  const rows = data?.orgs;
   return (
     <Card className="overflow-x-auto">
       <h2 className="text-lg font-semibold">Espacios de trabajo</h2>
+      {data?.capped && <p className="mt-1 text-sm text-ink-soft">Mostrando los {data.limit} espacios más recientes. Hay más; los conteos marcados con «+» están limitados.</p>}
       <table className="mt-3 w-full min-w-[720px] text-left text-sm">
         <thead className="text-ink-soft">
           <tr>{["Nombre", "Plan", "Miembros", "Cuentas", "Automatizaciones", "Conversaciones", "IA este mes", "Última actividad"].map((h) => <th key={h} scope="col" className="py-2 pr-3 font-medium">{h}</th>)}</tr>
@@ -122,12 +144,12 @@ function Orgs({ selected, onSelect }: { selected: Id<"orgs"> | null; onSelect: (
         <tbody>
           {(rows ?? []).map((o) => (
             <tr key={o.orgId} className={`border-t border-line ${selected === o.orgId ? "bg-brand-wash" : ""}`}>
-              <td className="py-2 pr-3"><button type="button" className="font-medium text-brand underline-offset-2 hover:underline" onClick={() => { onSelect(o.orgId); void record({ orgId: o.orgId }); }}>{o.name}</button></td>
+              <td className="py-2 pr-3"><button type="button" className="font-medium text-brand underline-offset-2 hover:underline" onClick={() => onSelect(o.orgId)}>{o.name}</button></td>
               <td className="pr-3">{o.plan}</td>
-              <td className="pr-3">{o.members}</td>
-              <td className="pr-3">{o.accounts}</td>
-              <td className="pr-3">{o.automations}</td>
-              <td className="pr-3">{o.conversations}</td>
+              <td className="pr-3">{count(o.members, o.capped.members)}</td>
+              <td className="pr-3">{count(o.accounts, o.capped.accounts)}</td>
+              <td className="pr-3">{count(o.automations, o.capped.automations)}</td>
+              <td className="pr-3">{count(o.conversations, o.capped.conversations)}</td>
               <td className="pr-3">{o.aiReplies}/{o.aiQuota} ({usd(o.costUsdMicros)})</td>
               <td>{o.lastActivityAt ? fmtTime(o.lastActivityAt) : "Sin actividad"}</td>
             </tr>
@@ -139,18 +161,18 @@ function Orgs({ selected, onSelect }: { selected: Id<"orgs"> | null; onSelect: (
   );
 }
 
-function OrgDetail({ orgId, onClose }: { orgId: Id<"orgs">; onClose: () => void }) {
-  const d = useQuery(api.platform.orgDetail, { orgId });
-  if (d === undefined) return <p className="text-sm text-ink-soft">Cargando…</p>;
-  if (d === null) return <p className="text-sm text-ink-soft">Ese espacio ya no existe.</p>;
+function OrgDetail({ d, onRefresh, onClose }: { d: OrgSnapshot; onRefresh: () => void; onClose: () => void }) {
   return (
     <Card className="space-y-5">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">{d.name}</h2>
-          <p className="text-sm text-ink-soft">Creado {fmtTime(d.createdAt)}{d.settings ? `, zona ${d.settings.timezone}, idioma ${d.settings.defaultLanguage}` : ""}. Solo lectura.</p>
+          <p className="text-sm text-ink-soft">Creado {fmtTime(d.createdAt)}{d.settings ? `, zona ${d.settings.timezone}, idioma ${d.settings.defaultLanguage}` : ""}. Solo lectura, foto del momento en que lo abriste (queda registrado).</p>
         </div>
-        <Btn variant="ghost" onClick={onClose}>Cerrar</Btn>
+        <div className="flex gap-2">
+          <Btn variant="ghost" onClick={onRefresh}>Actualizar</Btn>
+          <Btn variant="ghost" onClick={onClose}>Cerrar</Btn>
+        </div>
       </div>
       <Section title="Cuentas conectadas" empty="Sin cuentas." rows={d.accounts.map((a) => [a.channel === "whatsapp" ? "WhatsApp" : "Instagram", a.username, a.status, a.webhookSubscribed ? "Webhook activo" : "Sin webhook"])} />
       <Section title="Miembros" empty="Sin miembros." rows={d.members.map((m) => [m.userId, m.role])} />
