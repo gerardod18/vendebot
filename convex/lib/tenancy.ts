@@ -6,6 +6,9 @@
  *   3. optionally require a minimum role,
  * and expose `ctx.orgId`, `ctx.userId`, `ctx.role` to the handler.
  * Handlers must still filter every table read/write by `ctx.orgId`.
+ *
+ * `superAdminQuery` / `superAdminMutation` are the ONLY cross-tenant entry points: they require a `superAdmins`
+ * row for the signed-in user and are used only by convex/platform.ts.
  */
 import { customMutation, customQuery } from "convex-helpers/server/customFunctions";
 import { v } from "convex/values";
@@ -26,7 +29,16 @@ export async function requireMember(
   orgId: Id<"orgs">,
   minRole: Role = "agent",
 ) {
-  const userId = await requireUserId(ctx);
+  return requireMemberOf(ctx, orgId, await requireUserId(ctx), minRole);
+}
+
+/** Membership check for a user id resolved by the caller (e.g. a public action, which has no `db`, passes it to an internal query). */
+export async function requireMemberOf(
+  ctx: Pick<QueryCtx, "db">,
+  orgId: Id<"orgs">,
+  userId: string,
+  minRole: Role = "agent",
+) {
   const member = await ctx.db
     .query("members")
     .withIndex("by_org_user", (q) => q.eq("orgId", orgId).eq("userId", userId))
@@ -55,4 +67,22 @@ export const orgAdminMutation = customMutation(mutation, {
 export const orgAdminQuery = customQuery(query, {
   args: { orgId: v.id("orgs") },
   input: async (ctx, { orgId }) => ({ ctx: await requireMember(ctx, orgId, "admin"), args: {} }),
+});
+
+/** Platform operator check. Same error as a missing membership so the endpoint can't be probed. */
+export async function requireSuperAdmin(ctx: QueryCtx | MutationCtx) {
+  const userId = await requireUserId(ctx);
+  const row = await ctx.db.query("superAdmins").withIndex("by_userId", (q) => q.eq("userId", userId)).unique();
+  if (!row) throw new Error("Forbidden");
+  return { userId };
+}
+
+export const superAdminQuery = customQuery(query, {
+  args: {},
+  input: async (ctx) => ({ ctx: await requireSuperAdmin(ctx), args: {} }),
+});
+
+export const superAdminMutation = customMutation(mutation, {
+  args: {},
+  input: async (ctx) => ({ ctx: await requireSuperAdmin(ctx), args: {} }),
 });

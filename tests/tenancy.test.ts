@@ -16,7 +16,8 @@ describe("orgs + tenancy", () => {
     const mine = await as(t, "u1").query(api.orgs.listMine, {});
     expect(mine).toEqual([{ orgId, name: "Tienda Ana", slug: "tienda-ana", role: "owner" }]);
     const settings = await as(t, "u1").query(api.orgs.getSettings, { orgId });
-    expect(settings).toMatchObject({ aiModel: "claude-haiku-5-5", aiMonthlyQuota: 200, hasByoKey: false });
+    expect(settings).toMatchObject({ aiMonthlyQuota: 200 });
+    expect(settings).not.toHaveProperty("aiModel");
     expect(settings).not.toHaveProperty("byoAnthropicKeyEnc");
   });
 

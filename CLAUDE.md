@@ -21,7 +21,7 @@ The owner uses it for their own projects first, and may later sell it to very sm
 - Webhook handlers must be **idempotent**: dedupe by Instagram message id (`mid`) or comment id.
 - Instagram access tokens are **encrypted at rest** (`convex/lib/crypto.ts`). Never log them.
 - Don't add new infrastructure (queues, extra DBs) without a decision entry. Convex components cover queues (Workpool), durable flows (Workflow), rate limits (Rate Limiter) and the AI agent (Agent).
-- The default AI model is `claude-haiku-5-5` (cheap). `claude-sonnet-5-5` is the optional "smart" tier per workspace. The provider stays swappable through the AI SDK (`@ai-sdk/anthropic`).
+- The default AI model is `claude-haiku-5-5` (cheap). `claude-sonnet-5-5` is the optional "smart" tier per workspace. The provider stays swappable through the AI SDK: `@ai-sdk/anthropic` (direct) or `@openrouter/ai-sdk-provider` (OpenRouter, any `vendor/model` id). Provider/model resolution lives in `convex/ai/models.ts` (pure) and `convex/ai/provider.ts`.
 - Install with `npm install`. `.npmrc` sets `legacy-peer-deps=true` (see Known issues in STATUS).
 
 ## Commands

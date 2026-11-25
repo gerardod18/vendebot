@@ -4,7 +4,10 @@
  * Unknown shapes are ignored, never thrown. Verify against live payloads when possible.
  */
 
-export type InboundEvent =
+/** Channel an event arrived on. Omitted means Instagram; only the WhatsApp parser sets it. */
+export type EventChannel = "instagram" | "whatsapp";
+
+export type InboundEvent = (
   | {
       type: "message";
       dedupeKey: string; // message mid
@@ -14,6 +17,7 @@ export type InboundEvent =
       text?: string;
       quickReplyPayload?: string;
       replyToStoryId?: string;
+      senderName?: string; // WhatsApp supplies the contact's profile name in the webhook
     }
   | {
       type: "story_mention";
@@ -43,7 +47,8 @@ export type InboundEvent =
       mediaId?: string;
       text: string;
       isReply: boolean; // a reply to another comment
-    };
+    }
+) & { channel?: EventChannel };
 
 type Json = Record<string, any>;
 

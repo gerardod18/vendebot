@@ -34,7 +34,7 @@ export type Effect =
   | { type: "note"; text: string }
   | { type: "http"; url: string; method: "GET" | "POST"; body?: string }
   | { type: "handoff"; message?: string }
-  | { type: "startAi"; nodeId: string; instructions: string; exitWhen: string; timeoutMinutes: number; useKnowledge: boolean; model?: string }
+  | { type: "startAi"; nodeId: string; instructions: string; exitWhen: string; timeoutMinutes: number; useKnowledge: boolean }
   | { type: "scheduleTimeout"; minutes: number; reason: "wait" | "reply" | "ai" };
 
 export const MAX_STEPS = 100;
@@ -162,7 +162,7 @@ export function step(
       case "aiAgent":
         effects.push({
           type: "startAi", nodeId: node.id, instructions: node.instructions, exitWhen: node.exitWhen,
-          timeoutMinutes: node.timeoutMinutes, useKnowledge: node.useKnowledge, model: node.model,
+          timeoutMinutes: node.timeoutMinutes, useKnowledge: node.useKnowledge,
         });
         effects.push({ type: "scheduleTimeout", minutes: node.timeoutMinutes, reason: "ai" });
         state = { ...state, status: "waiting", waitingFor: "ai" };

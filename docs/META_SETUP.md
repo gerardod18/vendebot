@@ -1,11 +1,13 @@
 # Meta / Instagram setup and rules
 
+> **2026-11-24 update:** new Meta apps only offer **Unified login** (Facebook Login for Business: `config_id`, business system-user token, `graph.facebook.com`, permissions `instagram_basic` / `instagram_manage_messages` / `instagram_manage_comments`). The classic Instagram-login flow below (`instagram_business_*` scopes, `graph.instagram.com`) was removed from the code. Set `META_CONFIG_ID`. WhatsApp uses the Cloud API with its own test number. Step-by-step demo setup: `~/claude-plans/vendebot/demo-plan.md`.
+
 > Meta changes these screens and limits often. Treat the steps as a guide and confirm against
-> developers.facebook.com (Instagram Platform → "Instagram API with Instagram Login").
+> developers.facebook.com (Instagram Platform → "Instagram API with Unified Login"). The classic "Instagram API with Instagram Login" walkthrough was removed (see the collapsed note in section 3).
 
 ## 1. Requirements
 - An Instagram **professional** account (Business or Creator). Personal accounts can't use the API.
-- A Meta developer account and a Meta app of type **Business**, with the **Instagram** product added and configured for "API setup with Instagram login".
+- A Meta developer account and a Meta app of type **Business**, with the **Instagram** product added and a Facebook Login for Business **configuration** (its id is `META_CONFIG_ID`).
 - A public HTTPS URL for webhooks. Use the Convex HTTP actions URL: `https://<deployment>.convex.site/meta/webhook`.
 
 ## 2. Access levels
@@ -16,11 +18,17 @@
 
 Known issue to check on day one: some developers report `messages` webhooks not arriving on Standard Access or in Development mode even though the Conversations API shows the DM. If that happens, try switching the app to Live mode, and check the Meta developer community.
 
-## 3. Permissions (Instagram Login scopes)
-- `instagram_business_basic`: profile and account id
-- `instagram_business_manage_messages`: receive and send DMs
-- `instagram_business_manage_comments`: read comments, private replies, public replies
-- (later) `instagram_business_content_publish`: only if we add publishing
+## 3. Permissions (Unified login, current)
+Chosen in the dashboard configuration (`config_id`), not sent as a `scope` parameter:
+- `instagram_basic`: profile and account id
+- `instagram_manage_messages`: receive and send DMs
+- `instagram_manage_comments`: read comments, private replies, public replies
+
+<details>
+<summary>Removed: classic Instagram-login scopes (<code>instagram_business_*</code>, <code>graph.instagram.com</code>)</summary>
+
+New Meta apps no longer offer this flow and the code for it was deleted: `instagram_business_basic`, `instagram_business_manage_messages`, `instagram_business_manage_comments`, `instagram_business_content_publish`, the `api.instagram.com/oauth/access_token` exchange and the long-lived token refresh. Do not follow older guides that use them.
+</details>
 
 ## 4. Webhook setup
 1. In the app dashboard → Instagram → Webhooks: callback URL `https://<deployment>.convex.site/meta/webhook`, verify token = `META_WEBHOOK_VERIFY_TOKEN`.
@@ -29,13 +37,14 @@ Known issue to check on day one: some developers report `messages` webhooks not 
 4. Test by sending a DM from a **different** Instagram account.
 
 ## 5. Values to put in Convex env
-`META_APP_ID`, `META_APP_SECRET`, `META_WEBHOOK_VERIFY_TOKEN`, `META_GRAPH_VERSION`.
+`META_APP_ID`, `META_APP_SECRET`, `META_WEBHOOK_VERIFY_TOKEN`, `META_GRAPH_VERSION`, `META_CONFIG_ID` (the Facebook Login for Business configuration id), and optionally `META_PUBLIC_URL` (public base URL of the HTTP actions when developing behind a tunnel; it overrides `CONVEX_SITE_URL` for the OAuth redirect).
 OAuth redirect URI to register in the app: `https://<deployment>.convex.site/meta/oauth/callback`.
+Data deletion callback URL: `https://<deployment>.convex.site/meta/data-deletion`. Deauthorize callback URL: `https://<deployment>.convex.site/meta/deauthorize`. Privacy policy / terms URLs: `<SITE_URL>/privacy`, `<SITE_URL>/terms` (drafts, get them reviewed).
 
 ## 6. Messaging rules the product must enforce
 - **User-initiated only.** You can only message people who messaged you, commented, or mentioned you. No cold DMs.
 - **24-hour window** from the user's last message for automated messages.
-- **`HUMAN_AGENT` tag:** a human (not the bot) can reply up to **7 days** after the last user message.
+- **`HUMAN_AGENT` tag (Instagram only):** a human (not the bot) can reply up to **7 days** after the last user message. WhatsApp has no such extension: 24 hours, then only approved templates (not built yet).
 - **Private replies to comments:** one private DM per comment. Rate limit of about **750/hour per account**.
 - Send API: about 100–300 calls/second per account (sources disagree; stay conservative). Conversations API: 2 calls/second.
 - Every bot experience must offer a way to reach a human (our `handoff` node + inbox).

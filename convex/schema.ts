@@ -72,7 +72,9 @@ export default defineSchema({
     plan: v.string(),
     aiModel: v.string(),
     aiMonthlyQuota: v.number(),
+    aiProvider: v.optional(v.union(v.literal("anthropic"), v.literal("openrouter"))), // default anthropic
     byoAnthropicKeyEnc: v.optional(v.string()),
+    byoOpenRouterKeyEnc: v.optional(v.string()),
     timezone: v.string(),
     businessHours: v.object({
       days: v.array(v.number()), // 0 = Sunday ... 6 = Saturday
@@ -83,11 +85,42 @@ export default defineSchema({
     aiInstructions: v.optional(v.string()),
   }).index("by_org", ["orgId"]),
 
+  // ---- Platform (cross-tenant) ----
+  /** Platform operators. A row with `userId` is an active superAdmin; without it, a pending grant claimed by that email. */
+  superAdmins: defineTable({
+    email: v.string(), // lowercase
+    userId: v.optional(v.string()),
+    addedBy: v.string(),
+    claimedAt: v.optional(v.number()),
+  }).index("by_email", ["email"]).index("by_userId", ["userId"]),
+
+  /** One row (key "ai"): the AI provider, model and keys for the whole service. Only superAdmins change it. */
+  platformSettings: defineTable({
+    key: v.literal("ai"),
+    aiProvider: v.union(v.literal("anthropic"), v.literal("openrouter")),
+    aiModel: v.string(),
+    anthropicKeyEnc: v.optional(v.string()),
+    openRouterKeyEnc: v.optional(v.string()),
+    updatedBy: v.string(),
+    updatedAt: v.number(),
+  }).index("by_key", ["key"]),
+
+  /** Who did what across tenants (config changes, grants, workspace views). */
+  adminAudit: defineTable({
+    userId: v.string(),
+    action: v.string(),
+    orgId: v.optional(v.id("orgs")),
+    detail: v.optional(v.string()),
+    at: v.number(),
+  }).index("by_at", ["at"]),
+
   // ---- Instagram ----
   igAccounts: defineTable({
     orgId: v.id("orgs"),
-    igUserId: v.string(), // IG professional account id (webhook entry.id)
-    username: v.string(),
+    igUserId: v.string(), // IG professional account id (webhook entry.id); for WhatsApp, the phone_number_id. Unique per (channel, igUserId) among non-revoked rows; revoked rows stay with the workspace that owned them.
+    channel: v.optional(v.union(v.literal("instagram"), v.literal("whatsapp"))), // default instagram
+    wabaId: v.optional(v.string()), // WhatsApp Business Account id
+    username: v.string(), // IG username; for WhatsApp, the display phone number
     name: v.optional(v.string()),
     profilePictureUrl: v.optional(v.string()),
     tokenEnc: v.string(),
@@ -121,7 +154,8 @@ export default defineSchema({
     firstSeenAt: v.number(),
   })
     .index("by_org", ["orgId"])
-    .index("by_account_igsid", ["igAccountId", "igsid"]),
+    .index("by_account_igsid", ["igAccountId", "igsid"])
+    .index("by_igsid", ["igsid"]),
 
   conversations: defineTable({
     orgId: v.id("orgs"),
@@ -135,6 +169,7 @@ export default defineSchema({
     agentThreadId: v.optional(v.string()),
   })
     .index("by_org_lastMessageAt", ["orgId", "lastMessageAt"])
+    .index("by_org_mode_lastMessageAt", ["orgId", "mode", "lastMessageAt"])
     .index("by_contact", ["contactId"]),
 
   messages: defineTable({
@@ -164,7 +199,8 @@ export default defineSchema({
     error: v.optional(v.string()),
   })
     .index("by_dedupeKey", ["dedupeKey"])
-    .index("by_receivedAt", ["receivedAt"]),
+    .index("by_receivedAt", ["receivedAt"])
+    .index("by_org_receivedAt", ["orgId", "receivedAt"]),
 
   // ---- Automations ----
   flows: defineTable({
@@ -181,6 +217,7 @@ export default defineSchema({
     flowId: v.id("flows"),
     version: v.number(),
     graph: v.any(), // validated by convex/engine/graph.ts
+    layout: v.optional(v.any()), // editor block positions: { [nodeId]: { x, y } }
     createdBy: v.string(),
   }).index("by_flow", ["flowId", "version"]),
 
@@ -211,13 +248,40 @@ export default defineSchema({
       v.literal("cancelled"),
     ),
     currentNodeId: v.optional(v.string()),
-    waitingFor: v.optional(v.union(v.literal("reply"), v.literal("ai"))),
+    waitingFor: v.optional(v.union(v.literal("reply"), v.literal("ai"), v.literal("timer"))),
+    /** Bumped on every wait so stale scheduled timeouts are ignored. */
+    waitSeq: v.optional(v.number()),
+    /** comment-to-DM: first send goes out as a private reply to this comment. */
+    replyToCommentId: v.optional(v.string()),
+    /** AI turn in progress (ms epoch). Prevents two concurrent AI replies for one run. */
+    aiLockUntil: v.optional(v.number()),
     vars: v.record(v.string(), v.string()),
     error: v.optional(v.string()),
     endedAt: v.optional(v.number()),
   })
     .index("by_conversation_status", ["conversationId", "status"])
-    .index("by_org", ["orgId"]),
+    .index("by_flowVersion_status", ["flowVersionId", "status"])
+    .index("by_endedAt", ["endedAt"])
+    .index("by_org", ["orgId"])
+    .index("by_org_status", ["orgId", "status"]),
+
+  /** Meta data-deletion callback requests (status page shows `status` by `code`). */
+  deletionRequests: defineTable({
+    code: v.string(),
+    subjectId: v.string(),
+    requestedAt: v.number(),
+    status: v.union(v.literal("completed"), v.literal("nothing_found")),
+    deletedContacts: v.number(),
+  }).index("by_code", ["code"]),
+
+  notes: defineTable({
+    orgId: v.id("orgs"),
+    conversationId: v.id("conversations"),
+    contactId: v.id("contacts"),
+    text: v.string(),
+    author: v.string(), // user id, "bot" or "ai"
+    createdAt: v.number(),
+  }).index("by_conversation", ["conversationId", "createdAt"]),
 
   // ---- AI ----
   knowledge: defineTable({
